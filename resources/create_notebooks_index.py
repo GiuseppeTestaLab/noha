@@ -1,4 +1,3 @@
-
 import os
 import argparse
 import yaml
@@ -44,11 +43,13 @@ def main():
 
     html_subtitle = markdown.markdown(config_dict["subtitle"])
     print(INDEX_TEMPLATE_HEADER.format(config_dict["title"], config_dict["short_title"], html_subtitle))
+    
     for k, v in config_dict["pages"].items():
        html_description = markdown.markdown(v["description"])
-       path_to_file = v["notebook"].replace("ipynb", "html")
-       file_name = path_to_file.split("/")[-1]
+       path_to_file = v["notebook"].replace(".ipynb", ".html")  
+       file_name = os.path.basename(path_to_file)
        print(INDEX_TEMPLATE_LINKLINE.format(k, file_name, html_description))
+       
     html_final = markdown.markdown(config_dict["final"])
     print(INDEX_TEMPLATE_FINAL.format(html_final))
 
