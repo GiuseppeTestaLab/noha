@@ -1,0 +1,251 @@
+---
+title: "EndPoints hormonal treatment - CTL04 WGCNA"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'CTL04'
+    OutputFolder: '~/DataDir/bulkRNASeq/8.WGCNA/CTL04/3_ModuleFunctional/'
+---
+
+##### WGCNA on `r params$Dataset`.
+
+
+## 1. Environment Set Up
+
+### 1.1 Values of RMarkdown parameters
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
+
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(dplyr)
+library(ggplot2)
+
+library(viridis)
+library(SummarizedExperiment)
+
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(topGO)
+```
+
+```{r FolderSetting}
+Dataset <- params$Dataset
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+ dir.create(OutputFolder, recursive=TRUE)
+}
+```
+
+
+### 1.2 Helper functions
+
+```{r, collapse=TRUE}
+source('WGCNAHelper.R')
+```
+
+****
+
+## 2. Data Upload
+
+
+### 2.1 Objects from first step
+
+```{r, collapse=TRUE}
+load('~/DataDir/bulkRNASeq/8.WGCNA/CTL04/2_ModuleCharacterization/GeneMetrics.RData')
+```
+
+
+### 2.2 Modules of interest
+
+```{r, collapse=TRUE}
+modules <- c('turquoise', 'blue', 'green', 'brown', 
+             'red', 'midnightblue', 'black', 'pink', 
+             'magenta', 'purple', 'greenyellow', 'tan', 
+             'cyan', 'grey60', 'lightgreen', 'lightyellow',
+             'royalblue', 'darkred')
+```
+
+
+****
+
+## 3. Gene Ontology Analysis: data preparation
+
+### 3.1 Gene Vectors
+
+```{r, collapse=TRUE}
+GeneVectors <- topGOGeneVectors(GeneMetrics, modules)
+names(GeneVectors)
+```
+
+### 3.2 Ontology Annotation
+
+```{r, collapse=TRUE}
+BPann <- topGO::annFUN.org(whichOnto="BP", feasibleGenes=names(GeneVectors[[1]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+MFann <- topGO::annFUN.org(whichOnto="MF", feasibleGenes=names(GeneVectors[[1]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+CCann <- topGO::annFUN.org(whichOnto="CC", feasibleGenes=names(GeneVectors[[1]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+```
+
+****
+
+## 4. Biological Processes
+
+### 4.1 Enrichment
+
+```{r, collapse=TRUE}
+ResBP <- list()
+
+for(i in 1:length(modules)){
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=BPann, ontology='BP', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant BP terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResBP[[i]] <- Res
+  names(ResBP)[i] <- modules[i]
+  write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_BP.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+### 4.2 Barplots
+
+```{r, collapse=TRUE}
+GOPlots <- list()
+
+for(i in 1:length(modules)){
+  Plot <- topGOBarplot(ResBP[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+  GOPlots$BP_Bar[[i]] <- Plot
+  names(GOPlots$BP_Bar)[i] <- modules[i]
+}
+
+```
+
+```{r, fig.width=14, fig.height=14}
+BPBar <- gridExtra::grid.arrange(GOPlots$BP_Bar$turquoise, GOPlots$BP_Bar$blue, GOPlots$BP_Bar$green, GOPlots$BP_Bar$brown, 
+                                 GOPlots$BP_Bar$red, GOPlots$BP_Bar$midnightblue, GOPlots$BP_Bar$black, GOPlots$BP_Bar$pink, 
+                                 GOPlots$BP_Bar$magenta,  GOPlots$BP_Bar$purple, GOPlots$BP_Bar$greenyellow, GOPlots$BP_Bar$tan,
+                                 GOPlots$BP_Bar$cyan, GOPlots$BP_Bar$grey60, GOPlots$BP_Bar$lightgreen, GOPlots$BP_Bar$lightyellow,
+                                 GOPlots$BP_Bar$royalblue, GOPlots$BP_Bar$darkred,
+                                 ncol=4)
+ggsave(file=paste0(OutputFolder, 'BP_Barplot.pdf'), BPBar, width=25, height=25)
+BPBar
+```
+
+
+****
+
+## 5. Molecular Function
+
+### 5.1 Enrichment
+
+```{r, collapse=TRUE}
+ResMF <- list()
+
+for(i in 1:length(modules)){
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=MFann, ontology='MF', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant MF terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResMF[[i]] <- Res
+  names(ResMF)[i] <- modules[i]
+  write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_MF.txt'), sep='\t', row.names=FALSE)
+}
+```
+
+### 5.2 Barplots
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  Plot <- topGOBarplot(ResMF[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+  GOPlots$MF_Bar[[i]] <- Plot
+  names(GOPlots$MF_Bar)[i] <- modules[i]
+}
+
+```
+
+```{r, fig.width=14, fig.height=14}
+MFBar <- gridExtra::grid.arrange(GOPlots$MF_Bar$turquoise, GOPlots$MF_Bar$blue, GOPlots$MF_Bar$green, GOPlots$MF_Bar$brown, 
+                                 GOPlots$MF_Bar$red, GOPlots$MF_Bar$midnightblue, GOPlots$MF_Bar$black, GOPlots$MF_Bar$pink, 
+                                 GOPlots$MF_Bar$magenta,  GOPlots$MF_Bar$purple, GOPlots$MF_Bar$greenyellow, GOPlots$MF_Bar$tan,
+                                 GOPlots$MF_Bar$cyan, GOPlots$MF_Bar$grey60, GOPlots$MF_Bar$lightgreen, GOPlots$MF_Bar$lightyellow,
+                                 GOPlots$MF_Bar$royalblue, GOPlots$MF_Bar$darkred,
+                                 ncol=4)
+ggsave(file=paste0(OutputFolder, 'MFBarplot.pdf'), MFBar, width=25, height=25)
+MFBar
+```
+
+
+****
+
+## 6. Cellular Component
+
+### 6.1 Enrichment
+
+```{r, collapse=TRUE}
+ResCC <- list()
+
+for(i in 1:length(modules)){
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=CCann, ontology='CC', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant CC terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResCC[[i]] <- Res
+  names(ResCC)[i] <- modules[i]
+  write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_CC-.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+### 6.2 Barplots
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  Plot <- topGOBarplot(ResCC[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+  GOPlots$CC_Bar[[i]] <- Plot
+  names(GOPlots$CC_Bar)[i] <- modules[i]
+}
+
+```
+
+```{r, fig.width=14, fig.height=14, collapse=TRUE}
+CCBar <- gridExtra::grid.arrange(GOPlots$CC_Bar$turquoise, GOPlots$CC_Bar$blue, GOPlots$CC_Bar$green, GOPlots$CC_Bar$brown, 
+                                 GOPlots$CC_Bar$red, GOPlots$CC_Bar$midnightblue, GOPlots$CC_Bar$black, GOPlots$CC_Bar$pink, 
+                                 GOPlots$CC_Bar$magenta,  GOPlots$CC_Bar$purple, GOPlots$CC_Bar$greenyellow, GOPlots$CC_Bar$tan,
+                                 GOPlots$CC_Bar$cyan, GOPlots$CC_Bar$grey60, GOPlots$CC_Bar$lightgreen, GOPlots$CC_Bar$lightyellow,
+                                 GOPlots$CC_Bar$royalblue, GOPlots$CC_Bar$darkred,
+                                 ncol=4)
+ggsave(file=paste0(OutputFolder, 'CCBarplot.pdf'), CCBar, width=25, height=25)
+CCBar
+```
+
+****
+
+## 7. Savings
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+#save.image(paste0(OutputFolder, 'FunctionalWorkspace.RData'))
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+``` 
+
+
+
+

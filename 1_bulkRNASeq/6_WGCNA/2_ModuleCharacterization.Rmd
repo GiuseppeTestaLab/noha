@@ -1,0 +1,1093 @@
+---
+title: "EndPoints hormonal treatment - CTL04 WGCNA"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'CTL04'
+    OutputFolder: '~/DataDir/bulkRNASeq/8.WGCNA/CTL04/2_ModuleCharacterization/'
+---
+
+##### WGCNA on `r params$Dataset`.
+
+## 1. Environment Set Up
+
+### 1.1 Values of RMarkdown parameters
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, collapse = TRUE)
+```
+
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(dplyr)
+library(ggplot2)
+library(DT)
+
+library(viridis)
+library(sechm)
+library(WGCNA)
+library(SummarizedExperiment)
+```
+
+```{r FolderSetting}
+Dataset <- params$Dataset
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+ dir.create(OutputFolder, recursive=TRUE)
+}
+```
+
+### 1.2 Helper functions
+
+```{r}
+source('WGCNAHelper.R')
+```
+
+------------------------------------------------------------------------
+
+## 2. Data Upload
+
+### 2.1 Objects from first step
+
+```{r collapse=TRUE}
+load('~/DataDir/bulkRNASeq/8.WGCNA/CTL04/1_NetworkGeneration/NetworkGeneration.RData')
+DummyTotal <- DummyTraits
+```
+
+Objects generated from first step:
+
+-   SE_Bio: starting SE
+-   adjacency: adjacency matrix
+-   dissTOM: TOM distance matrix
+-   DummyTraits: phenotypic traits
+-   ModuleAssignment: assignment for each gene to a module
+-   FinalMEs: module eigengenes
+-   VstSel: selected, transformed, transposed expression matrix
+
+### 2.2 Settings
+
+```{r, collapse=TRUE}
+metadata(SE_WGCNA)$anno_colors <- list(Condition = c('DMSO' = 'grey30', 'CTL' = 'azure3', 
+                 'AhHyd_Ag'='#F8766D', 'AhHyd_Inh'='#F8766D50',
+                 'Andr_Ag'='#fccb17', 'Andr_Inh'='#C49A0050',  
+                 "Estr_Ag"= '#53B400', "Estr_Inh"= '#53B40050', 
+                 'GC_Ag' = '#00C094', 'GC_Inh' = '#00C09450',
+                 'LivX_Ag' = '#00B6EB', 'LivX_Inh' = '#00B6EB50', 
+                 'Ret_Ag' = '#A58AFF', 'Ret_Inh' = '#A58AFF50', 
+                 'Thyr_Ag' = '#FB61D7', 'Thyr_Inh' = '#FB61D750'
+                 ))
+```
+
+```{r}
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+CorrCols <- c('darkblue', "blue","white","forestgreen", 'green')
+```
+
+****
+
+## 3. Module correlation with phenotypic traits
+
+### 3.1 Correlation between module eigengenes and phenotypic traits
+
+```{r collapse=TRUE}
+DummyTraits <- DummyTotal[,-c(1:4, 21)]
+
+nGenes <- ncol(VstSel) 
+nSamples <- nrow(VstSel)
+
+# spearman correlation
+SpearmanCor <- WGCNA::cor(FinalMEs, DummyTraits, use = 'p', method='spearman')
+SpearmanPvalue <- WGCNA::corPvalueStudent(SpearmanCor, nSamples)
+
+# pearson correlation
+PearsonCor <- WGCNA::cor(FinalMEs, DummyTraits, use = 'p', method='pearson')
+PearsonPvalue <- WGCNA::corPvalueStudent(PearsonCor, nSamples)
+```
+
+### 3.2 Visualize correlation matrix
+
+**Spearman**
+
+```{r fig.width=14, fig.height=7, fig.align='center'}
+textMatrix <- paste(signif(SpearmanCor,2), '\n(', signif(SpearmanPvalue, 1), ')', sep = '')
+dim(textMatrix) <- dim(SpearmanCor)
+WGCNA::labeledHeatmap(Matrix = SpearmanCor, xLabels=names(DummyTraits), yLabels=names(FinalMEs), ySymbols=names(FinalMEs), 
+                      colorLabels=FALSE, colors=viridis(50)[15:50], textMatrix = textMatrix, setStdMargins = FALSE, 
+                      cex.text = 0.5, zlim = c(-1,1), main = paste('Module-trait relationships'))
+```
+
+**Pearson**
+
+```{r fig.width=14, fig.height=7, fig.align='center'}
+textMatrix <- paste(signif(PearsonCor,2), '\n(', signif(PearsonPvalue, 1), ')', sep = '')
+dim(textMatrix) <- dim(PearsonCor)
+WGCNA::labeledHeatmap(Matrix = PearsonCor, xLabels=names(DummyTraits), yLabels=names(FinalMEs), ySymbols=names(FinalMEs), 
+                      colorLabels=FALSE, colors=viridis(50)[15:50], textMatrix = textMatrix, setStdMargins = FALSE, 
+                      cex.text = 0.5, zlim = c(-1,1), main = paste('Module-trait relationships'))
+```
+
+## 4. Gene and sample -related metrics
+
+### 4.1 Gene Module Membership
+
+The Gene Module Membership quantifies the membership of each gene to all the identified modules. It is calculated by correlating for each gene its expression profile with the module eigengene of a given module.
+
+```{r collapse=TRUE}
+Cor <- corAndPvalue(VstSel, FinalMEs, use='p',  method='spearman')
+
+CorCoeff <- data.frame(Cor$cor)
+names(CorCoeff) <- paste0('MM', substring(names(CorCoeff), 3))
+CorCoeff$Gene <- row.names(Cor$cor)
+
+CorP <- data.frame(Cor$p)
+names(CorP) <- paste0('p_MM', substring(names(CorP), 3))
+CorP$Gene <- row.names(Cor$p)
+```
+
+```{r collapse=TRUE}
+# Generation of data frame containing relevant information
+GeneMM <- dplyr::inner_join(CorCoeff, CorP, by='Gene') %>% 
+  dplyr::inner_join(ModuleAssignment, by='Gene')# %>%
+#  dplyr::inner_join(GeneMeta, by='Gene') %>% dplyr::select(33, 32, 1:15, 17:31, 16, 34:36)
+
+dim(GeneMM)
+```
+
+### 4.2 Gene Connectivity Measures
+
+
+```{r, collapse=TRUE}
+GeneCon <- intramodularConnectivity(adjacency, colors=ModuleAssignment$Module)
+GeneCon$Gene <- row.names(GeneCon)
+```
+
+### 4.3 Gene Metrics dataframe
+
+```{r, collapse=TRUE}
+GeneMetrics <- dplyr::inner_join(GeneMM, GeneCon, by='Gene') 
+GeneMetrics <- dplyr::left_join(GeneMetrics, dplyr::select(data.frame(rowData(SE_WGCNA)), c(2,4,5)), join_by('Gene'=='GeneName'))
+rm(GeneMM, GeneCon)
+```
+
+```{r, collapse=TRUE}
+table(GeneMetrics$Module)
+table(GeneMetrics$GeneBiotype)
+```
+
+### 4.4. Sample module eigengenes and treatment information
+
+```{r collapse=TRUE}
+METraits <- dplyr::mutate(data.frame(FinalMEs), Sample=row.names(FinalMEs)) %>% 
+  inner_join(data.frame(DummyTotal) , by=c('Sample'='HRID'))
+```
+
+## 5. Turquoise Module {.tabset}
+
+### 5.1 Module definition
+
+```{r collapse=TRUE}
+ModName <- 'turquoise'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %) .
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 5.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 5.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 5.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 5.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 5.6 Interactive table
+
+```{r collapse=TRUE}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 6. Blue Module {.tabset}
+
+### 6.1 Module definition
+
+```{r}
+ModName <- 'blue'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 6.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 6.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 6.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 6.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 6.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 7. Green Module {.tabset}
+
+### 7.1 Module definition
+
+```{r}
+ModName <- 'green'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 7.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 7.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 7.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 7.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 7.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 8. Brown Module {.tabset}
+
+### 8.1 Module definition
+
+```{r}
+ModName <- 'brown'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 8.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 8.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 8.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 8.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 8.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 9. Red Module {.tabset}
+
+### 9.1 Module definition
+
+```{r}
+ModName <- 'red'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 9.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 9.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 9.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 9.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 9.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 10. Midnightblue Module {.tabset}
+
+### 10.1 Module definition
+
+```{r}
+ModName <- 'midnightblue'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 10.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 10.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 10.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 10.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 10.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 11. Black Module {.tabset}
+
+### 11.1 Module definition
+
+```{r}
+ModName <- 'black'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 11.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 11.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 11.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 11.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 11.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 12. Pink Module {.tabset}
+
+### 12.1 Module definition
+
+```{r}
+ModName <- 'pink'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 12.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 12.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 12.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 12.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 12.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 13. Magenta Module {.tabset}
+
+### 13.1 Module definition
+
+```{r}
+ModName <- 'magenta'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 13.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 13.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 13.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 13.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 13.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 14. Purple Module {.tabset}
+
+### 14.1 Module definition
+
+```{r}
+ModName <- 'purple'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 14.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 14.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 14.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 14.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 14.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 15. Greenyellow Module {.tabset}
+
+### 15.1 Module definition
+
+```{r}
+ModName <- 'greenyellow'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 15.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 15.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 15.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 15.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 15.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 16. Tan Module {.tabset}
+
+### 16.1 Module definition
+
+```{r}
+ModName <- 'tan'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 16.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 16.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 16.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 16.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 16.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 17. Cyan Module {.tabset}
+
+### 17.1 Module definition
+
+```{r}
+ModName <- 'cyan'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 17.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 17.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 17.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 17.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 17.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 18. Grey60 Module {.tabset}
+
+### 18.1 Module definition
+
+```{r}
+ModName <- 'grey60'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 18.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 18.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 18.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 18.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 18.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 19. Lightgreen Module {.tabset}
+
+### 19.1 Module definition
+
+```{r}
+ModName <- 'lightgreen'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 19.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 19.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 19.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 19.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 19.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 20. Lightyellow Module {.tabset}
+
+### 20.1 Module definition
+
+```{r}
+ModName <- 'lightyellow'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 20.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 20.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 20.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 20.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 20.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 21. Royalblue Module {.tabset}
+
+### 21.1 Module definition
+
+```{r}
+ModName <- 'royalblue'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 21.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 21.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 21.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 21.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 21.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 22. Darkred Module {.tabset}
+
+### 22.1 Module definition
+
+```{r}
+ModName <- 'darkred'
+TopGenes <- ifelse(dim(dplyr::filter(GeneMetrics, Module==ModName))[1] > 250, 250,
+                   dim(dplyr::filter(GeneMetrics, Module==ModName))[1])
+```
+
+The module contains `r dim(dplyr::filter(GeneMetrics, Module==ModName))[1]` genes: `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1]` protein-coding and `r dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1]` lncRNAs (`r round(dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='lncRNA'))[1] / dim(dplyr::filter(GeneMetrics, Module==ModName & GeneBiotype=='protein_coding'))[1] * 100)` %).
+
+The top-`r TopGenes` genes according to intramodular connectivity will be shown in interactive scatterplot and table.
+
+### 22.2 Module eigengene boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxME(METraits=METraits, module=ModName, ascisse='Condition', title=NULL, 
+      lines='Yes', reference='DMSO')
+```
+
+### 22.3 Module membership boxplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+boxMM(GeneMM=GeneMetrics, module=ModName, title=NULL)
+```
+
+### 22.4 Module heatmap
+
+```{r fig.width=14, fig.height=8, fig.align='center'}
+sechm(SE_WGCNA, features=GeneMetrics[GeneMetrics$Module==ModName, ]$Gene, assayName="vst", gaps_at="Condition",
+      top_annotation='Condition', hmcols=ScaledCols,  do.scale=TRUE, breaks=0.8, 
+      anno_colors = metadata(SE_WGCNA)$anno_colors)
+```
+
+### 22.5 Interactive Scatterplot
+
+```{r fig.width=10, fig.height=6, fig.align='center'}
+plotGeneMetrics(GeneMetrics, module=ModName, title=NULL, top=TopGenes)
+```
+
+### 22.6 Interactive table
+
+```{r}
+interactiveMetrics(GeneMetrics, Module=ModName)
+```
+
+------------------------------------------------------------------------
+
+## 23. Savings {.tabset}
+
+```{r Save}
+save(GeneMetrics, file=paste0(OutputFolder, 'GeneMetrics.RData'))
+write.table(GeneMetrics, file=paste0(OutputFolder, 'GeneMetrics.txt'), sep='\t')
+```
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+save.image(paste0(OutputFolder, 'ModuleCharacterization.RData'))
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+```

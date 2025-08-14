@@ -1,0 +1,429 @@
+---
+title: "Functional Enrichment analysis with EnrichBrowser for CTL04"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'yeti'
+        highlight: 'tango'
+        code_folding: hide
+params: 
+    DEAListFile: '~/DataDir/bulkRNASeq/5.DifferentialExpression/CTL04/DEARes.rds'
+    SE_DEAFile: '~/DataDir/bulkRNASeq/5.DifferentialExpression/CTL04/SE_DEA.rds'
+    OutputFolder: NULL  
+    Condition_1: ''
+    Condition_2: ''
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, collapse = TRUE)
+```
+
+```{r, collapse=TRUE}
+Condition_1 <- params$Condition_1
+Condition_2 <- params$Condition_2
+```
+
+__Top GO Analysis for `r Condition_1` `r Condition_2`__
+
+## 1. Environment Set Up
+
+Values of RMarkdown parameters
+
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(EnrichmentBrowser)
+library(ReportingTools)
+```
+
+```{r FolderSetting}
+OutputFolder <- ifelse(is.null(params$OutputFolder), getwd(), params$OutputFolder) 
+
+if (dir.exists(OutputFolder) == FALSE) {
+  dir.create(OutputFolder, recursive=TRUE)
+} else {
+  oldFiles <- list.files(OutputFolder)
+  
+  if (length(oldFiles) > 0){
+    message('The analysis was previously performed with the following results:\n',
+            paste0(oldFiles, sep=', '), '\n!! They will be DELETED !!')
+    #Remove previous outputs
+    unlink(paste0(OutputFolder, oldFiles), recursive=TRUE)
+  }
+}
+```
+
+
+****
+
+## 2. Data Upload
+
+ * DEA: list containing results from differential expression analysis at different conditions
+ * SE_DEA: summarized experiment object generated from analyzed dds. Assay names are set to be compatible to downstream analyses
+
+```{r Data, collapse=TRUE}
+DEA <- readRDS(params$DEAListFile)
+SE_DEA <- readRDS(params$SE_DEAFile)
+# specify the assay names in compliance of package requirement
+names(assays(SE_DEA)) #names(5): counts mu H cooks vst
+# counts assay set as raw
+names(assays(SE_DEA))[1] <- 'raw'
+# vst assay set as norm
+names(assays(SE_DEA))[5] <- 'norm'
+
+#to make iterable the script
+names(DEA$Thyr) <- c("Ag", "Inh", "AgvsInh")
+names(DEA$Andr) <- c("Ag", "Inh", "AgvsInh")
+names(DEA$Ret) <- c("Ag", "Inh", "AgvsInh")
+names(DEA$LivX) <- c("Ag", "Inh", "AgvsInh")
+names(DEA$GC) <- c("Ag", "Inh", "AgvsInh")
+names(DEA$AhHyd) <- c("Ag", "Inh", "AgvsInh")
+names(DEA$Estr) <- c("Ag", "Inh", "AgvsInh")
+```
+
+Upload of the results of differential expression analyses for the different treatments. Information is loaded for **`r nrow(SE_DEA)`** genes; GeneNames are unique.
+
+****
+
+## 3. Gene Sets retrieval and Compilation of a gene regulatory network from pathway databases
+
+The following gene sets are retrieved: 
+
+ * KEGG
+ * HallMark gene sets from MSigDB
+ * EnrichR
+ 
+To obtain the interactive report, the analysis must be done using EntrezID as gene identifier.
+
+### 3.1 KEGG Pathway Database
+
+```{r, collapse=TRUE}
+GsKegg <- getGenesets(org="hsa", db="kegg", gene.id.type="ENTREZID")
+```
+
+### 3.2 Molecular Signature Database
+
+```{r, collapse=TRUE}
+GsH <- getGenesets(org = 'hsa', db = 'msigdb', cat=c('H'), gene.id.type = 'ENTREZID')
+```
+
+### 3.3 EnrichR
+
+```{r, collapse=TRUE}
+GsEnrichReactome <- getGenesets(org='hsa', db='enrichr', lib='Reactome_2022', gene.id.type = 'ENTREZID')
+GSEnrichDisgenet <- getGenesets(org='hsa', db='enrichr', lib='DisGeNET', gene.id.type = 'ENTREZID')
+GSEnrichHumanCyc <- getGenesets(org='hsa', db='enrichr', lib='HumanCyc_2016', gene.id.type = 'ENTREZID')
+```
+
+### 3.4 Kegg for GRN
+
+To perform network-based enrichment analysis a gene regulatory network (GRN) is required. 
+A network from regulations in KEGG pathway database is now compiled.
+
+```{r GeneRegulatoryNetworkI, collapse=TRUE}
+hsa.grn <- compileGRN(org="hsa", db="kegg")
+head(hsa.grn)
+```
+
+### 3.5 Reactome for GRN
+
+A network from regulations in Reactome pathway database is now compiled.
+
+```{r GeneRegulatoryNetworkII, collapse=TRUE}
+hsa.grn_reactome <- compileGRN(org="hsa", db="reactome")
+head(hsa.grn_reactome)
+```
+
+****
+
+## 4. Organize SE for `r Condition_1` `r Condition_2` 
+
+### 4.1 Add DEA results to SE object
+
+```{r, collapse=TRUE}
+if(! identical(rownames(SE_DEA), row.names(DEA[[Condition_1]][[Condition_2]]$Res))){
+  stop('Expression data in SE and results from differential espression analysis are inconsistent.')
+}
+rowData(SE_DEA) <- cbind(rowData(SE_DEA)[,1:6], DEA[[Condition_1]][[Condition_2]]$Res) 
+  
+# Column names must be set to be compliant with the required format to be recognized by ORA
+names(rowData(SE_DEA))[which(names(rowData(SE_DEA))=='log2FoldChange')] <- 'FC'
+names(rowData(SE_DEA))[which(names(rowData(SE_DEA))=='padj')] <- 'ADJ.PVAL'
+metadata(SE_DEA)$annotation <- 'hsa'
+```
+
+### 4.2 Sample Selection
+
+```{r, collapse=TRUE}
+if (Condition_2 != "AgvsInh"){
+  SE_DEA <- SE_DEA[, SE_DEA$Condition %in% c(paste0(Condition_1, "_", Condition_2), 'DMSO')]
+  SE_DEA$GROUP <- ifelse(SE_DEA$Condition==paste0(Condition_1, "_", Condition_2), 1, 0)
+} else { #AgvsInh case
+  SE_DEA <- SE_DEA[, SE_DEA$Condition %in% c(paste0(Condition_1, "_Ag"), paste0(Condition_1, "_Inh"))]
+  SE_DEA$GROUP <- ifelse(SE_DEA$Condition==paste0(Condition_1, "_Ag"), 1, 0)
+}
+```
+
+### 4.3 From Ensembl to Entrez ID
+
+```{r, collapse=TRUE}
+SE_DEA <- idMap(SE_DEA, org = "hsa", from = "SYMBOL", to = "ENTREZID")
+```
+
+### 4.4 Function to combine the reports
+
+```{r}
+#THIS FUNCTION:
+# - checks for the existence of the objects in `usedMethodsList` which store the analysis results to aggregate.
+# - checks that the methods identified significant results
+# - calls `combResults()` to combine different methods results (if more than one gave results)
+# - generates an interactive report both for the aggregated results or a single method
+#This should make the process of running the notebooks more automatized in case of many comparisons
+#-------------------------------------------------------------------------------
+combinedReport <- function(usedMethodsList, geneSetName='geneSet', nShow=30,
+                           generateReport=FALSE, outDir=getwd()) {
+  
+  idx <- which(sapply(usedMethodsList, exists, envir = globalenv())) 
+  comb <- lapply(names(idx), get, envir = globalenv())
+  names(comb) <- names(idx)
+  
+  message(paste0(length(comb), ' methods were used on the ', geneSetName, '
+                 reference Gene Set.'))
+  
+  emptyResIdx <- c() 
+  for (i in seq(length(comb))){
+    if (isTRUE(dim(comb[[i]]$res.tbl)[1] == 0)){
+      emptyResIdx <- c(emptyResIdx, i)
+    }
+  }
+  #Discard empty res from the list
+  if (length(emptyResIdx) > 0){
+    comb <- comb[-emptyResIdx]
+  } 
+  message(paste0(length(comb), ' methods identified significant results.'))
+  
+  #Stop if there are no reports to generate
+  if (length(comb) == 0) {
+    return(message('NO SIGNIFICANT RESULTS'))
+  }
+  
+  #3) Aggregate results
+  if (isTRUE(length(comb) > 1)){
+    Data <- combResults(comb, comb.fun='sum', rank.fun = "abs.ranks")
+    Name <- paste0('comb', geneSetName)
+  } else if (isTRUE(length(comb) == 0)) {
+    return(warning('STOPPING. No reports to generate.'))
+  } else {
+    Data <- get(names(comb), envir = globalenv())
+    Name <- names(comb)
+  }
+  if (isTRUE(generateReport)){ #Create interactive report
+    message('\nGenerating interactive HTML report')
+    tryCatch( 
+      expr = {
+        eaBrowse(Data, report.name=Name, graph.view=hsa.grn, nr.show=nShow, 
+                 out.dir=paste0(outDir, Name))
+      }, 
+      error = function(e){
+        msg <- paste0('Could not generate HTML report because of the following error:\n\n', e, '\nSkipping report generation and deleting result folder.')
+        warning(msg)
+        unlink(paste0(outDir, Name), recursive=TRUE)
+      }
+    )
+  }
+  return(Data)
+}
+```
+
+## 5. KEGG Analysis
+
+### 5.1 KEGG: Single-method analyses
+
+#### CAMERA method
+
+```{r collapse=TRUE}
+cameraKegg <- sbea(method='camera', se=SE_DEA, gs=GsKegg, padj.method='BH')
+cameraKegg$res.tbl %>% head(20)
+```
+
+#### PADOG method
+
+```{r collapse=TRUE}
+padogKegg <- sbea(method='padog', se=SE_DEA, gs=GsKegg, padj.method='BH')
+padogKegg$res.tbl %>% head(20)
+```
+
+### 5.2 KEGG: Network-based analyses
+
+#### GGEA method
+
+```{r, collapse=TRUE}
+nbea.ggeaKegg <- nbea(method="ggea", se=SE_DEA, gs=GsKegg, grn=hsa.grn, padj.method='BH')
+nbea.ggeaKegg$res.tbl %>% head(20)
+```
+
+#### DEGraph method
+
+```{r, collapse=TRUE}
+nbea.DEGraphKegg <- nbea(method="degraph", se=SE_DEA, gs=GsKegg, grn=hsa.grn, padj.method='BH')
+nbea.DEGraphKegg$res.tbl %>% head(20)
+```
+
+### 5.3 KEGG: Combine results
+
+```{r}
+keggMethods <- c('nbea.ggeaKegg', 'nbea.DEGraphKegg')
+
+combKegg <- combinedReport(keggMethods, geneSetName='Kegg', nShow=30,
+                           generateReport=TRUE, outDir=OutputFolder)
+```
+
+```{r, collapse=TRUE, eval=(length(combKegg) > 1)}
+gsRanking(combKegg) %>% 
+  data.frame() %>%
+  DT::datatable()
+```
+
+### 5.4 Reactome: Network-based analyses
+
+#### GGEA method
+
+```{r, collapse=TRUE}
+nbea.ggeaReactome <- nbea(method="ggea", se=SE_DEA, gs=GsEnrichReactome, grn=hsa.grn_reactome, padj.method='BH')
+nbea.ggeaReactome$res.tbl%>% head(20)
+```
+
+#### DEGraph method
+
+```{r, collapse=TRUE}
+nbea.DEGraphReactome <- nbea(method="degraph", se=SE_DEA, gs=GsEnrichReactome, grn=hsa.grn_reactome, padj.method='BH')
+nbea.DEGraphReactome$res.tbl %>% head(20)
+```
+
+### 5.5 Reactome: Combine results
+
+```{r}
+ReactomeMethods <- c('nbea.ggeaReactome', 'nbea.DEGraphReactome')
+
+combReactome <- combinedReport(ReactomeMethods, geneSetName='Reactome', nShow=30,
+                           generateReport=TRUE, outDir=OutputFolder)
+```
+
+```{r, collapse=TRUE, eval=(length(combReactome) > 1)}
+gsRanking(combReactome) %>%
+  data.frame() %>%
+  DT::datatable()
+```
+
+## 6. MolSigDB Analysis 
+
+### 6.1 MSig: Single-method analyses
+
+#### Camera method
+
+```{r collapse=TRUE}
+cameraMSig <- sbea(method='camera', se=SE_DEA, gs=c(GsH), padj.method='BH')
+cameraMSig$res.tbl%>% head(20)
+```
+
+#### PADOG method
+
+```{r collapse=TRUE}
+padogMSig <- sbea(method='padog', se=SE_DEA, gs=c(GsH), padj.method='BH')
+padogMSig$res.tbl %>% head(20)
+```
+
+### 6.2 MSig: Combine results
+
+```{r}
+MSigMethods <- c('cameraMSig', 'padogMSig')
+
+combMSig <- combinedReport(MSigMethods, geneSetName='MSig', nShow=30,
+                           generateReport=TRUE, outDir=OutputFolder)
+```
+
+```{r, collapse=TRUE, eval=(length(combMSig) > 1)}
+gsRanking(combMSig)
+  data.frame() %>%
+  DT::datatable()
+```
+
+## 7. EnrichR Analysis 
+
+### 7.1 EnrichR: Single-method analyses
+
+#### 7.1.1 DisGeNET
+
+##### CAMERA method
+
+```{r collapse=TRUE}
+cameraER_Disgenet <- sbea(method='camera', se=SE_DEA, gs=c(GSEnrichDisgenet), padj.method='BH')
+cameraER_Disgenet$res.tbl%>% head(20)
+```
+
+##### PADOG method
+
+```{r collapse=TRUE}
+padogER_Disgenet <- sbea(method='padog', se=SE_DEA, gs=c(GSEnrichDisgenet), padj.method='BH')
+padogER_Disgenet$res.tbl %>% head(20)
+```
+
+#### 7.1.2 DisGeNET: Combine results
+
+```{r}
+ER_DisgenetMethods <- c('cameraER_Disgenet', 'padogER_Disgenet')
+
+combER_Disgenet <- combinedReport(ER_DisgenetMethods, geneSetName='ER_Disgenet', nShow=30,
+                           generateReport=TRUE, outDir=OutputFolder)
+```
+
+```{r, collapse=TRUE, eval=(length(combER_Disgenet) > 1)}
+gsRanking(combER_Disgenet) %>%  
+  data.frame() %>%
+  DT::datatable()
+```
+
+#### 7.1.3 HumanCyc_2016
+
+##### CAMERA method
+
+```{r collapse=TRUE}
+cameraER_HumanCyc <- sbea(method='camera', se=SE_DEA, gs=c(GSEnrichHumanCyc), padj.method='BH')
+cameraER_HumanCyc$res.tbl%>% head(20)
+```
+
+##### PADOG method
+
+```{r collapse=TRUE}
+padogER_HumanCyc <- sbea(method='padog', se=SE_DEA, gs=c(GSEnrichHumanCyc), padj.method='BH')
+padogER_HumanCyc$res.tbl %>% head(20)
+```
+
+#### 7.1.4 HumanCyc_2016: Combine results
+
+```{r}
+ER_HumanCycMethods <- c('cameraER_HumanCyc', 'padogER_HumanCyc')
+
+combER_HumanCyc <- combinedReport(ER_HumanCycMethods, geneSetName='ER_HumanCyc', nShow=30,
+                           generateReport=TRUE, outDir=OutputFolder)
+```
+
+```{r, collapse=TRUE, eval=(length(combER_HumanCyc) > 1)}
+gsRanking(combER_HumanCyc) %>%
+  data.frame() %>%
+  DT::datatable()
+```
+
+### 8. Savings
+
+```{r SessionInfo}
+date()
+sessionInfo()
+```

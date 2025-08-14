@@ -1,0 +1,847 @@
+---
+title: "EndPoints hormonal treatments - CTL08"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    InputFolder: '~/DataDir/bulkRNASeq/5.DifferentialExpression/CTL08/'
+    OutputFolder: '~/DataDir/bulkRNASeq/9.DEGsCharacterization/CTL08/BubblePlots/'
+
+---
+
+## Purpose
+
+Compare the DEGs obtained across time points and produce related visualizations.
+
+Approaches
+
+__Basic DEA vs DMSO__
+
+ * Overlap of genes modulated by Agonist treatment vs DMSO (split in up-reg and down-reg) - section 3
+ * Overlap of genes modulated by Inhibitor treatment vs DMSO (split in up-reg and down-reg) - section 4
+ * Overlap of up-regulated genes induced by treatment vs DMSO (either agonist or antagonist) - section 5
+ * Overlap of down-regulated genes induced by treatment vs DMSO (either agonist or antagonist) - section 6
+
+__Basic DEA Agonist vs Inhibitor__ 
+
+ * Overlap of genes modulated by Agonist treatment vs Inhibitor (split in up-reg and down-reg) - section 7
+
+Analyses are performed for all pathways or a selected subset (estrogen, retionic, thyroid, liverX). 
+
+
+# 1. Environment SetUp  
+ 
+```{r EnvironmentSetupII, collapse=TRUE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(GeneOverlap)
+
+OutputFolder <- params$OutputFolder
+```
+
+
+****
+
+# 2. Data Upload
+
+DEA analysis with SeqRun as co-variable. 
+
+```{r, collapse=TRUE}
+DEA <- readRDS(paste0(params$InputFolder, 'DEARes.rds'))
+```
+
+
+****
+
+# 3. Comparison across pathways: treatment with Agonist
+
+## 3.1 Perform Overlap
+
+```{r, collapse=TRUE}
+DEGs_Agonist <- list(
+  
+  Thyr_Ag_Up= row.names(DEA$Thyr$Agonist$DEGs[DEA$Thyr$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Thyr_Ag_Down= row.names(DEA$Thyr$Agonist$DEGs[DEA$Thyr$Agonist$DEGs$log2FoldChange < 0, ]),
+  
+  Ret_Ag_Up= row.names(DEA$Ret$Agonist$DEGs[DEA$Ret$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Ret_Ag_Down= row.names(DEA$Ret$Agonist$DEGs[DEA$Ret$Agonist$DEGs$log2FoldChange < 0, ]),
+  
+  Estr_Ag_Up= row.names(DEA$Estr$Agonist$DEGs[DEA$Estr$Agonist$DEGs$log2FoldChange > 0, ]),
+  Estr_Ag_Down= row.names(DEA$Estr$Agonist$DEGs[DEA$Estr$Agonist$DEGs$log2FoldChange < 0, ]),
+  
+  Andr_Ag_Up= row.names(DEA$Andr$Agonist$DEGs[DEA$Andr$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Andr_Ag_Down= row.names(DEA$Andr$Agonist$DEGs[DEA$Andr$Agonist$DEGs$log2FoldChange < 0, ]), 
+  
+  GC_Ag_Up= row.names(DEA$GC$Agonist$DEGs[DEA$GC$Agonist$DEGs$log2FoldChange > 0, ]),
+  GC_Ag_Down= row.names(DEA$GC$Agonist$DEGs[DEA$GC$Agonist$DEGs$log2FoldChange < 0, ]),
+  
+  LivX_Ag_Up= row.names(DEA$LivX$Agonist$DEGs[DEA$LivX$Agonist$DEGs$log2FoldChange > 0, ]), 
+  LivX_Ag_Down= row.names(DEA$LivX$Agonist$DEGs[DEA$LivX$Agonist$DEGs$log2FoldChange < 0, ]), 
+  
+  AhHyd_Ag_Up= row.names(DEA$AhHyd$Agonist$DEGs[DEA$AhHyd$Agonist$DEGs$log2FoldChange > 0, ]), 
+  AhHyd_Ag_Down= row.names(DEA$AhHyd$Agonist$DEGs[DEA$AhHyd$Agonist$DEGs$log2FoldChange < 0, ])
+  
+            )
+```
+
+
+```{r, collapse=TRUE}
+Universe <- row.names(DEA$Ret$Agonist$Res) %>% unique()
+length(Universe)
+```
+
+```{r, collapse=TRUE}
+OvObj <- newGOM(DEGs_Agonist, DEGs_Agonist, genome.size=length(Universe))
+print(OvObj)
+```
+
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='intersection')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='pval')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='odds.ratio')
+```
+
+
+## 3.2 Visualize overlap results
+
+### DotPlot: data preparation
+```{r, collapse=TRUE}
+OR <- data.frame(getMatrix(OvObj, name='odds.ratio')) 
+OR$DEGs <- row.names(OR) 
+OR <- gather(OR, 'KBase', 'OR', -DEGs)
+PVAL <- data.frame(getMatrix(OvObj, name='pval')) 
+PVAL$DEGs <- row.names(PVAL) 
+PVAL <- gather(PVAL, 'KBase', 'PVal', -DEGs)
+NUM <- data.frame(getMatrix(OvObj, name='intersection')) 
+NUM$DEGs <- row.names(NUM) 
+NUM <- gather(NUM, 'KBase', 'Numbers', -DEGs)
+if(! identical(OR$DEGs, PVAL$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$DEGs, NUM$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+Res <- mutate(OR, Pval=PVAL$PVal) %>% mutate(Numbers=NUM$Numbers)
+Res
+```
+
+```{r, collapse=TRUE}
+ResMod <- Res
+
+ResMod[ResMod$DEGs == ResMod$KBase, ]$OR <- 1
+ResMod[ResMod$DEGs == ResMod$KBase, ]$Pval <- 1
+
+ResMod
+```
+
+
+### DotPlot: visualization 
+
+I select as significant overlaps having an OR > 2 and at least 25 overlapping genes. Dots are shown for PVals < 0.01 (set in the plot). Max value in the plot must be set according to minimum PVal to avoid dots not to be shown.
+
+```{r, fig.width=10, fig.height=8}
+cols <- viridis::cividis(100)[1:80]
+ResSel <- dplyr::filter(ResMod, OR > 2) %>% dplyr::filter(Numbers > 25) 
+min(ResSel$Pval)
+max(ResSel$OR)
+
+Dot <- ggplot(ResSel, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle('Overlap across agonist-modulated genes')
+  
+Dot
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_Agonist.pdf'), width=8, height=8)
+```
+
+
+## 3.3 Visualize overlap results selectively for retinoic, liverX, estrogen, thyroid
+
+### Selection
+
+```{r, collapse=TRUE}
+Path <- c('Thyr_Ag_Up', 'Thyr_Ag_Down', 'Ret_Ag_Up', 'Ret_Ag_Down', 
+          'Estr_Ag_Up', 'Estr_Ag_Down', 'LivX_Ag_Up', 'LivX_Ag_Down')
+ResPath <- ResSel[ResSel$DEGs %in% Path & ResSel$KBase %in% Path, ]
+
+ResPath
+```
+
+
+### DotPlot: visualization
+
+
+```{r, fig.width=10, fig.height=8}
+
+ResPath <- dplyr::filter(ResPath, OR > 2) %>% dplyr::filter(Numbers > 25) 
+min(ResPath$Pval)
+max(ResPath$OR)
+
+Dot <- ggplot(ResPath, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  ggtitle('Overlap across agonist-modulated genes')
+
+  
+Dot
+
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_Agonist_Selected.pdf'), width=8, height=8)
+```
+
+
+# 4. Comparison across pathways: treatment with Inhibitor
+
+## 4.1 Perform Overlap
+
+```{r, collapse=TRUE}
+DEGs_Inh <- list(
+  
+  Thyr_Inh_Up= row.names(DEA$Thyr$Inhibitor$DEGs[DEA$Thyr$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  Thyr_Inh_Down= row.names(DEA$Thyr$Inhibitor$DEGs[DEA$Thyr$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  Ret_Inh_Up= row.names(DEA$Ret$Inhibitor$DEGs[DEA$Ret$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  Ret_Inh_Down= row.names(DEA$Ret$Inhibitor$DEGs[DEA$Ret$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  Andr_Inh_Up= row.names(DEA$Andr$Inhibitor$DEGs[DEA$Andr$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  Andr_Inh_Down= row.names(DEA$Andr$Inhibitor$DEGs[DEA$Andr$Inhibitor$DEGs$log2FoldChange < 0, ]), 
+  
+  GC_Inh_Up= row.names(DEA$GC$Inhibitor$DEGs[DEA$GC$Inhibitor$DEGs$log2FoldChange > 0, ]),
+  GC_Inh_Down= row.names(DEA$GC$Inhibitor$DEGs[DEA$GC$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  LivX_Inh_Up= row.names(DEA$LivX$Inhibitor$DEGs[DEA$LivX$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  LivX_Inh_Down= row.names(DEA$LivX$Inhibitor$DEGs[DEA$LivX$Inhibitor$DEGs$log2FoldChange < 0, ]), 
+  
+  AhHyd_Inh_Up= row.names(DEA$AhHyd$Inhibitor$DEGs[DEA$AhHyd$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  AhHyd_Inh_Down= row.names(DEA$AhHyd$Inhibitor$DEGs[DEA$AhHyd$Inhibitor$DEGs$log2FoldChange < 0, ])
+  
+            )
+```
+
+
+```{r, collapse=TRUE}
+Universe <- row.names(DEA$Ret$Inhibitor$Res) %>% unique()
+length(Universe)
+```
+
+```{r, collapse=TRUE}
+OvObj <- newGOM(DEGs_Inh, DEGs_Inh, genome.size=length(Universe))
+print(OvObj)
+```
+
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='intersection')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='pval')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='odds.ratio')
+```
+
+## 4.2 Visualize overlap results
+
+### DotPlot: data preparation
+
+```{r, collapse=TRUE}
+OR <- data.frame(getMatrix(OvObj, name='odds.ratio')) 
+OR$DEGs <- row.names(OR) 
+OR <- gather(OR, 'KBase', 'OR', -DEGs)
+PVAL <- data.frame(getMatrix(OvObj, name='pval')) 
+PVAL$DEGs <- row.names(PVAL) 
+PVAL <- gather(PVAL, 'KBase', 'PVal', -DEGs)
+NUM <- data.frame(getMatrix(OvObj, name='intersection')) 
+NUM$DEGs <- row.names(NUM) 
+NUM <- gather(NUM, 'KBase', 'Numbers', -DEGs)
+if(! identical(OR$DEGs, PVAL$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$DEGs, NUM$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+Res <- mutate(OR, Pval=PVAL$PVal) %>% mutate(Numbers=NUM$Numbers)
+Res
+```
+
+```{r, collapse=TRUE}
+ResMod <- Res
+
+ResMod[ResMod$DEGs == ResMod$KBase, ]$OR <- 1
+ResMod[ResMod$DEGs == ResMod$KBase, ]$Pval <- 1
+
+ResMod
+```
+
+
+### DotPlot: visualization
+
+I select as significant overlaps having an OR > 2 and at least 25 overlapping genes. Dots are shown for PVals < 0.01 (set in the plot). Max value in the plot must be set according to minimum PVal to avoid dots not to be shown.
+
+```{r, fig.width=10, fig.height=8}
+
+ResSel <- dplyr::filter(ResMod, OR > 2) %>% dplyr::filter(Numbers > 25) 
+min(ResSel$Pval)
+max(ResSel$OR)
+
+Dot <- ggplot(ResSel, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+    ggtitle('Overlap across Inhibitor-modulated genes')
+  
+Dot
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_Inhibitor.pdf'), width=8, height=8)
+```
+
+
+## 4.3 Visualize overlap results selectively for retinoic, liverX, thyroid
+
+### Selection
+
+```{r, collapse=TRUE}
+Path <- c('Thyr_Inh_Up', 'Thyr_Inh_Down', 'Ret_Inh_Up', 'Ret_Inh_Down', 'LivX_Inh_Up', 'LivX_Inh_Down')
+ResPath <- ResSel[ResSel$DEGs %in% Path & ResSel$KBase %in% Path, ]
+
+ResPath
+```
+
+No significant overlap found. 
+
+# 5. Comparison across pathways: up-regulated genes
+
+## 5.1 Perform the overlap
+
+```{r, collapse=TRUE}
+DEGs_UpReg <- list(
+  
+  Thyr_Ag= row.names(DEA$Thyr$Agonist$DEGs[DEA$Thyr$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Thyr_Inh= row.names(DEA$Thyr$Inhibitor$DEGs[DEA$Thyr$Inhibitor$DEGs$log2FoldChange > 0, ]),
+  
+  Ret_Ag= row.names(DEA$Ret$Agonist$DEGs[DEA$Ret$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Ret_Inh= row.names(DEA$Ret$Inhibitor$DEGs[DEA$Ret$Inhibitor$DEGs$log2FoldChange > 0, ]),
+  
+  Estr_Ag= row.names(DEA$Estr$Agonist$DEGs[DEA$Estr$Agonist$DEGs$log2FoldChange > 0, ]),
+  
+  Andr_Ag= row.names(DEA$Andr$Agonist$DEGs[DEA$Andr$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Andr_Inh= row.names(DEA$Andr$Inhibitor$DEGs[DEA$Andr$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  
+  GC_Ag= row.names(DEA$GC$Agonist$DEGs[DEA$GC$Agonist$DEGs$log2FoldChange > 0, ]),
+  GC_Inh= row.names(DEA$GC$Inhibitor$DEGs[DEA$GC$Inhibitor$DEGs$log2FoldChange > 0, ]),
+  
+  LivX_Ag= row.names(DEA$LivX$Agonist$DEGs[DEA$LivX$Agonist$DEGs$log2FoldChange > 0, ]), 
+  LivX_Inh= row.names(DEA$LivX$Inhibitor$DEGs[DEA$LivX$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  
+  AhHyd_Ag= row.names(DEA$AhHyd$Agonist$DEGs[DEA$AhHyd$Agonist$DEGs$log2FoldChange > 0, ]), 
+  AhHyd_Inh= row.names(DEA$AhHyd$Inhibitor$DEGs[DEA$AhHyd$Inhibitor$DEGs$log2FoldChange > 0, ])
+  
+            )
+```
+
+
+```{r, collapse=TRUE}
+Universe <- row.names(DEA$Ret$Inhibitor$Res) %>% unique()
+length(Universe)
+```
+
+```{r, collapse=TRUE}
+OvObj <- newGOM(DEGs_UpReg, DEGs_UpReg, genome.size=length(Universe))
+print(OvObj)
+```
+
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='intersection')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='pval')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='odds.ratio')
+```
+
+## 5.2 Visualize overlap results
+
+### DotPlot: data preparation
+
+```{r, collapse=TRUE}
+OR <- data.frame(getMatrix(OvObj, name='odds.ratio')) 
+OR$DEGs <- row.names(OR) 
+OR <- gather(OR, 'KBase', 'OR', -DEGs)
+PVAL <- data.frame(getMatrix(OvObj, name='pval')) 
+PVAL$DEGs <- row.names(PVAL) 
+PVAL <- gather(PVAL, 'KBase', 'PVal', -DEGs)
+NUM <- data.frame(getMatrix(OvObj, name='intersection')) 
+NUM$DEGs <- row.names(NUM) 
+NUM <- gather(NUM, 'KBase', 'Numbers', -DEGs)
+if(! identical(OR$DEGs, PVAL$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$DEGs, NUM$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+Res <- mutate(OR, Pval=PVAL$PVal) %>% mutate(Numbers=NUM$Numbers)
+Res
+```
+
+```{r, collapse=TRUE}
+ResMod <- Res
+
+ResMod[ResMod$DEGs == ResMod$KBase, ]$OR <- 1
+ResMod[ResMod$DEGs == ResMod$KBase, ]$Pval <- 1
+
+ResMod
+```
+
+
+### DotPlot: visualization
+
+I select as significant overlaps having an OR > 2 and at least 25 overlapping genes. Dots are shown for PVals < 0.01 (set in the plot). Max value in the plot must be set according to minimum PVal to avoid dots not to be shown.
+
+```{r, fig.width=10, fig.height=8}
+cols <- viridis::cividis(100)[1:80]
+ResSel <- dplyr::filter(ResMod, OR > 2) %>% dplyr::filter(Numbers > 25) 
+min(ResSel$Pval)
+max(ResSel$OR)
+
+Dot <- ggplot(ResSel, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+    ggtitle('Overlap across upregulated genes')
+  
+Dot
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_UpReg.pdf'), width=8, height=8)
+```
+
+
+## 5.3 Visualize overlap results selectively for retinoic, liverX, estrogen, thyroid
+
+### Selection
+
+Starting from already selected results, we identify only the ones related to the pathways of interest.
+
+```{r, collapse=TRUE}
+Path <- c('Thyr_Ag', 'Thyr_Inh', 'Ret_Ag', 'Ret_Inh', 'Estr_Ag', 'LivX_Ag', 'LivX_Inh')
+ResPath <- ResSel[ResSel$DEGs %in% Path & ResSel$KBase %in% Path, ]
+
+ResPath
+```
+
+
+### DotPlot: visualization
+
+```{r, fig.width=10, fig.height=8}
+min(ResPath$Pval)
+max(ResPath$OR)
+
+Dot <- ggplot(ResPath, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  ggtitle('Overlap across up-regulated genes')
+
+  
+Dot
+
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_Upreg_Selected.pdf'), width=8, height=8)
+```
+
+# 6. Comparison across pathways: down-regulated genes
+
+## 6.1 Perform the overlap
+
+```{r, collapse=TRUE}
+DEGs_DownReg <- list(
+  
+  Thyr_Ag= row.names(DEA$Thyr$Agonist$DEGs[DEA$Thyr$Agonist$DEGs$log2FoldChange < 0, ]), 
+  Thyr_Inh= row.names(DEA$Thyr$Inhibitor$DEGs[DEA$Thyr$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  Ret_Ag= row.names(DEA$Ret$Agonist$DEGs[DEA$Ret$Agonist$DEGs$log2FoldChange < 0, ]), 
+  Ret_Inh= row.names(DEA$Ret$Inhibitor$DEGs[DEA$Ret$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  Estr_Ag= row.names(DEA$Estr$Agonist$DEGs[DEA$Estr$Agonist$DEGs$log2FoldChange < 0, ]),
+
+  Andr_Ag= row.names(DEA$Andr$Agonist$DEGs[DEA$Andr$Agonist$DEGs$log2FoldChange < 0, ]), 
+  Andr_Inh= row.names(DEA$Andr$Inhibitor$DEGs[DEA$Andr$Inhibitor$DEGs$log2FoldChange < 0, ]), 
+  
+  GC_Ag= row.names(DEA$GC$Agonist$DEGs[DEA$GC$Agonist$DEGs$log2FoldChange < 0, ]),
+  GC_Inh= row.names(DEA$GC$Inhibitor$DEGs[DEA$GC$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  LivX_Ag= row.names(DEA$LivX$Agonist$DEGs[DEA$LivX$Agonist$DEGs$log2FoldChange < 0, ]), 
+  LivX_Inh= row.names(DEA$LivX$Inhibitor$DEGs[DEA$LivX$Inhibitor$DEGs$log2FoldChange < 0, ]), 
+  
+  AhHyd_Ag= row.names(DEA$AhHyd$Agonist$DEGs[DEA$AhHyd$Agonist$DEGs$log2FoldChange < 0, ]), 
+  AhHyd_Inh= row.names(DEA$AhHyd$Inhibitor$DEGs[DEA$AhHyd$Inhibitor$DEGs$log2FoldChange < 0, ])
+  
+            )
+```
+
+
+```{r, collapse=TRUE}
+Universe <- row.names(DEA$Ret$Inhibitor$Res) %>% unique()
+length(Universe)
+```
+
+```{r, collapse=TRUE}
+OvObj <- newGOM(DEGs_DownReg, DEGs_DownReg, genome.size=length(Universe))
+print(OvObj)
+```
+
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='intersection')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='pval')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='odds.ratio')
+```
+
+## 6.2 Visualize overlap results
+
+__DotPlot: data preparation__
+```{r, collapse=TRUE}
+OR <- data.frame(getMatrix(OvObj, name='odds.ratio')) 
+OR$DEGs <- row.names(OR) 
+OR <- gather(OR, 'KBase', 'OR', -DEGs)
+PVAL <- data.frame(getMatrix(OvObj, name='pval')) 
+PVAL$DEGs <- row.names(PVAL) 
+PVAL <- gather(PVAL, 'KBase', 'PVal', -DEGs)
+NUM <- data.frame(getMatrix(OvObj, name='intersection')) 
+NUM$DEGs <- row.names(NUM) 
+NUM <- gather(NUM, 'KBase', 'Numbers', -DEGs)
+if(! identical(OR$DEGs, PVAL$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$DEGs, NUM$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+Res <- mutate(OR, Pval=PVAL$PVal) %>% mutate(Numbers=NUM$Numbers)
+Res
+```
+
+```{r, collapse=TRUE}
+ResMod <- Res
+
+ResMod[ResMod$DEGs == ResMod$KBase, ]$OR <- 1
+ResMod[ResMod$DEGs == ResMod$KBase, ]$Pval <- 1
+
+ResMod
+```
+
+
+### DotPlot: visualization 
+
+I select as significant overlaps having an OR > 2 and at least 25 overlapping genes. Dots are shown for PVals < 0.01 (set in the plot). Max value in the plot must be set according to minimum PVal to avoid dots not to be shown.
+
+```{r, fig.width=10, fig.height=8}
+cols <- viridis::cividis(100)[1:80]
+ResSel <- dplyr::filter(ResMod, OR > 2) %>% dplyr::filter(Numbers > 25) 
+min(ResSel$Pval)
+max(ResSel$OR)
+
+Dot <- ggplot(ResSel, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+    ggtitle('Overlap across down-regulated genes')
+  
+Dot
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_DownReg.pdf'), width=8, height=8)
+```
+
+
+## 6.3 Visualize overlap results selectively for retinoic, liverX, estrogen, thyroid
+
+### Selection
+
+```{r, collapse=TRUE}
+Path <- c('Thyr_Ag', 'Thyr_Inh', 'Ret_Ag', 'Ret_Inh', 'Estr_Ag', 'LivX_Ag', 'LivX_Inh')
+ResPath <- ResSel[ResSel$DEGs %in% Path & ResSel$KBase %in% Path, ]
+
+ResPath
+```
+
+
+### DotPlot: visualization
+
+
+```{r, fig.width=10, fig.height=8}
+cols <- viridis::cividis(100)[1:80]
+ResPath <- dplyr::filter(ResPath, OR > 2) %>% dplyr::filter(Numbers > 25) 
+min(ResPath$Pval)
+max(ResPath$OR)
+
+Dot <- ggplot(ResPath, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  ggtitle('Overlap across down-regulated genes')
+
+  
+Dot
+
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_DownReg_Selected.pdf'), width=8, height=8)
+```
+
+
+****
+
+
+# 7. Comparison across pathways: Agonist versus Inhibitor analysis
+
+## 7.1 Perform Overlap
+
+```{r, collapse=TRUE}
+DEGs_AgvsInh <- list(
+  
+  Thyr_AgvsInh_Up= row.names(DEA$Thyr$AgvsInh$DEGs[DEA$Thyr$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  Thyr_AgvsInh_Down= row.names(DEA$Thyr$AgvsInh$DEGs[DEA$Thyr$AgvsInh$DEGs$log2FoldChange < 0, ]),
+  
+  Ret_AgvsInh_Up= row.names(DEA$Ret$AgvsInh$DEGs[DEA$Ret$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  Ret_AgvsInh_Down= row.names(DEA$Ret$AgvsInh$DEGs[DEA$Ret$AgvsInh$DEGs$log2FoldChange < 0, ]),
+  
+  Estr_AgvsInh_Up= row.names(DEA$Estr$AgvsInh$DEGs[DEA$Estr$AgvsInh$DEGs$log2FoldChange > 0, ]),
+  Estr_AgvsInh_Down= row.names(DEA$Estr$AgvsInh$DEGs[DEA$Estr$AgvsInh$DEGs$log2FoldChange < 0, ]),
+  
+  Andr_AgvsInh_Up= row.names(DEA$Andr$AgvsInh$DEGs[DEA$Andr$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  Andr_AgvsInh_Down= row.names(DEA$Andr$AgvsInh$DEGs[DEA$Andr$AgvsInh$DEGs$log2FoldChange < 0, ]), 
+  
+  GC_AgvsInh_Up= row.names(DEA$GC$AgvsInh$DEGs[DEA$GC$AgvsInh$DEGs$log2FoldChange > 0, ]),
+  GC_AgvsInh_Down= row.names(DEA$GC$AgvsInh$DEGs[DEA$GC$AgvsInh$DEGs$log2FoldChange < 0, ]),
+  
+  LivX_AgvsInh_Up= row.names(DEA$LivX$AgvsInh$DEGs[DEA$LivX$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  LivX_AgvsInh_Down= row.names(DEA$LivX$AgvsInh$DEGs[DEA$LivX$AgvsInh$DEGs$log2FoldChange < 0, ]), 
+  
+  AhHyd_AgvsInh_Up= row.names(DEA$AhHyd$AgvsInh$DEGs[DEA$AhHyd$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  AhHyd_AgvsInh_Down= row.names(DEA$AhHyd$AgvsInh$DEGs[DEA$AhHyd$AgvsInh$DEGs$log2FoldChange < 0, ])
+  
+            )
+```
+
+
+```{r, collapse=TRUE}
+Universe <- row.names(DEA$Ret$Agonist$Res) %>% unique()
+length(Universe)
+```
+
+```{r, collapse=TRUE}
+OvObj <- newGOM(DEGs_AgvsInh, DEGs_AgvsInh, genome.size=length(Universe))
+#print(OvObj)
+```
+
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='intersection')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='pval')
+```
+
+```{r, collapse=TRUE}
+getMatrix(OvObj, name='odds.ratio')
+```
+
+
+## 7.2 Visualize overlap results
+
+__DotPlot: data preparation__
+```{r, collapse=TRUE}
+OR <- data.frame(getMatrix(OvObj, name='odds.ratio')) 
+OR$DEGs <- row.names(OR) 
+OR <- gather(OR, 'KBase', 'OR', -DEGs)
+PVAL <- data.frame(getMatrix(OvObj, name='pval')) 
+PVAL$DEGs <- row.names(PVAL) 
+PVAL <- gather(PVAL, 'KBase', 'PVal', -DEGs)
+NUM <- data.frame(getMatrix(OvObj, name='intersection')) 
+NUM$DEGs <- row.names(NUM) 
+NUM <- gather(NUM, 'KBase', 'Numbers', -DEGs)
+if(! identical(OR$DEGs, PVAL$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$DEGs, NUM$DEGs)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+if(! identical(OR$KBase, NUM$KBase)){
+  stop('Inconsistecy')
+}
+Res <- mutate(OR, Pval=PVAL$PVal) %>% mutate(Numbers=NUM$Numbers)
+Res
+```
+
+```{r, collapse=TRUE}
+ResMod <- Res
+
+ResMod[ResMod$DEGs == ResMod$KBase, ]$OR <- 1
+ResMod[ResMod$DEGs == ResMod$KBase, ]$Pval <- 1
+
+ResMod
+```
+
+
+__DotPlot: visualization__ I select as significant overlaps having an OR > 2 and at least 25 overlapping genes. Dots are shown for PVals < 0.01 (set in the plot). Max value in the plot must be set according to minimum PVal to avoid dots not to be shown.
+
+```{r, fig.width=10, fig.height=8}
+
+ResSel <- dplyr::filter(ResMod, OR > 2) %>% dplyr::filter(Numbers > 25) 
+min(ResSel$Pval)
+max(ResSel$OR)
+
+Dot <- ggplot(ResSel, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1)) +
+    ggtitle('Overlap across AgvsInh-modulated genes')
+  
+Dot
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_AgvsInh.pdf'), width=8, height=8)
+```
+
+
+## 7.3 Visualize overlap results selectively for retinoic, liverX, estrogen, thyroid
+
+### Selection
+
+```{r, collapse=TRUE}
+Path <- c('Thyr_AgvsInh_Up', 'Thyr_AgvsInh_Down', 'Ret_AgvsInh_Up', 'Ret_AgvsInh_Down', 
+          'Estr_AgvsInh_Up', 'Estr_AgvsInh_Down', 'LivX_AgvsInh_Up', 'LivX_AgvsInh_Down')
+ResPath <- ResSel[ResSel$DEGs %in% Path & ResSel$KBase %in% Path, ]
+
+ResPath
+```
+
+
+### DotPlot: visualization
+
+
+```{r, fig.width=10, fig.height=8}
+
+ResPath <- dplyr::filter(ResPath, OR > 2) %>% dplyr::filter(Numbers > 25) 
+min(ResPath$Pval)
+max(ResPath$OR)
+
+Dot <- ggplot(ResPath, aes(DEGs, KBase, label=Numbers)) + 
+  geom_point(aes(size=-log10(Pval), col=OR)) + 
+  geom_text() + 
+  scale_size_continuous(range=c(2, 20), limits=c(2, round(-log10(min(ResSel$Pval)) + 0.5))) +
+  scale_color_viridis_c(limits=c(1, round(max(ResSel$OR)+1)), begin=0.2) + xlab('') + ylab('') +
+  theme_bw() +
+  theme(axis.line = element_blank(), axis.title = element_blank(), 
+        axis.text.x = element_text(angle = 45, hjust = 1))+
+  ggtitle('Overlap across AgvsInh-modulated genes')
+
+  
+Dot
+
+ggsave(Dot, filename=paste0(OutputFolder, 'DotPlot_AgvsInh_Selected.pdf'), width=8, height=8)
+```
+
+
+## 8. Session info
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+``` 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

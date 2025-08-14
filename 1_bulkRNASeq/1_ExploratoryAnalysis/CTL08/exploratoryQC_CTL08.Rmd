@@ -1,0 +1,436 @@
+---
+title: "Bulk RNASeq:Exploratory Analysis CTL08 after Samples' Selection"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'MaleLine'
+    CountFile: '~/DataDir/bulkRNASeq/3.DataExploration/CTL08/Input/Counts_CTL08.txt'
+    DesignFile: '~/DataDir/bulkRNASeq/3.DataExploration/CTL08/Input/Design_CTL08.txt'
+    GeneAnnotationFile: '~/DataDir/bulkRNASeq/3.DataExploration/GeneAnnotation/AnnotationEns101.txt'
+    OutputFolder: '~/DataDir/bulkRNASeq/3.DataExploration/CTL08/Output/AfterSamplesSelection/'
+    CpmFilt: 2
+    SampleFilt: 4
+---
+
+## Exploratory analysis on `r params$Dataset`
+
+### 1. Environment Set Up
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
+
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(RNASeqBulkExploratory)  #Our Package
+library(DT)
+library(gridExtra)
+library(SummarizedExperiment)
+library(ggplot2)
+```
+
+```{r FolderSetting}
+Dataset <- params$Dataset
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+  dir.create(OutputFolder, recursive=FALSE)
+}
+```
+
+****
+
+### 2. Data Upload
+
+ * Raw data produced by Salmon alignment
+ * Experimental design: metadata for the samples belonging to the dataset
+ * Gene annotation: metadata for the genes quantified in the dataset. Produced by AnnotationBiomart markdown 
+
+#### 2.1 Read Count Matrix 
+
+```{r Data_Counts, collapse=TRUE}
+RawCounts <- read.table(params$CountFile, sep='\t', header=TRUE)
+colSums(RawCounts[,-1])
+```
+
+#### 2.2 Design Matrix 
+
+```{r Data_Design, collapse=TRUE}
+Design <- read.table(params$DesignFile, sep='\t', header=TRUE)
+str(Design)
+```
+
+#### 2.3 Samples Selection
+
+```{r, collapse=TRUE}
+Samples_to_remove <- c("S32843_H45_Estr_Inh", "S32866_H44_Estr_Inh", "S35868_MTR1_DMSO", "S35869_MTR2_DMSO", "S35871_MTR4_Ret_Inh", "S35877_MTR10_Estr_Inh", "S35880_MTR13_GC_Inh")
+
+#new Raw Counts
+RawCounts <- RawCounts[, !(colnames(RawCounts)%in% Samples_to_remove)]
+
+#new Design Matrix
+Design <-Design[!(Design$HRID %in% Samples_to_remove), ] 
+row.names(Design) <- NULL #to reset row names after removing rows
+```
+
+```{r InteractiveDesign}
+as.data.frame(lapply(Design, factor)) %>% 
+  DT::datatable(class='hover', rownames=FALSE, caption='Sample identity and attributes', 
+                filter='top', escape=TRUE, extension='Buttons', 
+                options=list(pageLength=10, dom='Bfrtip', 
+                             columnDefs=list(list(className='dt-center', targets=c(5:(length(Design)-1)),
+                                                  visible=FALSE)),  #as if indexing starts from 0
+                             buttons=list(I('colvis'), c('csv', 'excel')))
+                )
+```
+
+__The dataset is structured in `r dim(RawCounts)[1]` genes measured in `r dim(RawCounts)[2]-1` samples.__   
+
+#### 2.3 Gene Annotation 
+
+```{r Data_Genes, collapse=TRUE}
+if (is.null(params$GeneAnnotation)==FALSE){
+  GeneAnnotation <- read.table(params$GeneAnnotationFile, sep='\t', header=TRUE)
+  if(identical((RawCounts$Gene), GeneAnnotation$Gene)==FALSE){
+    stop('ERROR! Gene order in count matrix and annotation matrix is not consistent. \n Please specify a data frame with the correct order.')
+  }
+}
+```
+
+```{r Data_GenesII, collapse=TRUE}
+if ('hgnc_symbol' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, HGNCSymbol=hgnc_symbol)
+}
+
+if ('external_gene_name' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, GeneName=external_gene_name)
+}
+
+if ('gene_biotype' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, GeneBiotype=gene_biotype)
+}
+
+if ('chromosome_name' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, Chr=chromosome_name)
+}
+
+if ('start_position' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, Start=start_position)
+}
+
+if ('end_position' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, End=end_position)
+}
+```
+
+****
+
+### 3. Raw Counts Distribution 
+
+__Density plot for Raw Read Counts distribution:__ log2 values for cpm are calculated for raw read counts (before any pre-processing steps) and visualized by density plot.
+
+```{r DensityRaw, fig.align='center', fig.width=9, fig.height=5}
+DensityRaw <- readCountDensityplot(countTable=RawCounts, GeneCol ='Gene', dgelist=FALSE, 
+                                   plotTitle='Raw Counts before filtering', prior.count=0.25, adjustment=0.5)
+DensityRaw
+```
+
+****
+
+### 4. Generation of Summarized Experiment
+
+```{r SE_Check, collapse=TRUE}
+if(identical(colnames(RawCounts)[-1], Design$HRID)==FALSE){
+    stop('ERROR! Gene order in count matrix and annotation matrix is not consistent. \n 
+         Please specify a data frame with the correct order.')
+  }
+```
+
+```{r SE, collapse=TRUE}
+SE <- createSE(countTable=RawCounts, sampleMeta=Design, geneMeta=GeneAnnotation, 
+               roundCounts=TRUE, showDuplicates=TRUE)
+```
+
+SE contains information about `r dim(SE)[1]` genes in `r dim(SE)[2]` samples. 
+
+****
+
+### 5. Removal of unwanted Biotypes
+
+The purpose of this step is to discard RNA species that are not wanted in the library and can cause biases in the analysis. 
+
+ * The filtering is based on gene biotype from Biomart retrieved-annotation  
+ * Only protein-coding are selected for downstream analyses. 
+ * A diagnostic plot is produced to evaluate 
+    + the % of reads associated to the most expressed gene before the biotype selection 
+    + the % of removed reads after biotype selection  
+
+#### 5.1 Biotype-selected SE
+
+```{r BiotypeSel, collapse=TRUE}
+SE_Bio <- biotypeSelectSE(SE, lncRNA=FALSE, otherBios=NULL, showRemoved=TRUE)
+
+RemovedGenes <-  rowData(SE)[!(rownames(rowData(SE)) %in% rownames(rowData(SE_Bio))), ]
+```
+
+**After the gene selection based on biotypes, the dataset is structured in `r dim(SE_Bio)[1]` genes measured in `r dim(SE_Bio)[2]` samples. `r dim(RemovedGenes)[1]` have been discarded.**
+
+#### 5.2 Diagnostic Barplots {.tabset}
+
+##### Reads associated to **most expressed** gene
+
+```{r RemovedGenesII, fig.align='center', fig.width=9, fig.height=5, collapse=TRUE}
+plotCompareMax(SE, SE_Bio, PlotTitle=NULL, Interactive=TRUE)
+```
+
+##### Removed Reads **after biotype selection**
+
+```{r RemovedGenes, fig.align='center', fig.width=9, fig.height=5, collapse=TRUE}
+plotComparePerc(SE, SE_Bio, PlotTitle=NULL, Interactive=TRUE)
+```
+
+
+#### {-}
+
+```{r RemovedGenesSave, collapse=TRUE, include=FALSE}
+ggsave(filename=paste0(OutputFolder, '/CompareLibSize.pdf'), 
+  plot=gridExtra::grid.arrange(
+    plotCompareMax(SE, SE_Bio, PlotTitle=NULL, Interactive=FALSE), 
+    plotComparePerc(SE, SE_Bio, PlotTitle=NULL, Interactive=FALSE), ncol=1), 
+  device='pdf', width=10, height=10)
+```
+
+
+****
+
+### 6. Gene expression filtering and SE normalization
+
+#### 6.1 Setting gene filtering thresholds
+
+```{r FiltThresholds}
+CpmFilt <- params$CpmFilt
+if(is.numeric(CpmFilt)==FALSE){
+  stop('ERROR! Cpm threshold for gene filtering has a non-numeric value')
+}
+
+SampleFilt <- ifelse(params$SampleFilt=='Default', dim(SE_Bio)[2]/2, params$SampleFilt)
+if(is.numeric(SampleFilt)==FALSE){
+  stop('ERROR! Sample threshold for gene filtering has a non-numeric value')
+}
+```
+
+__Genes having an expression lower than `r CpmFilt` in at least `r SampleFilt` samples are filtered out.__
+
+
+#### 6.2 Filter out low expressed genes
+
+ * Compute temporary cpm (without TMM normalization, not stored in SE)
+ * Filter out lowly-expressed genes
+
+
+```{r SE_Filt, collapse=TRUE}
+SE_Bio$lib.size
+SE_Filt <- filterSE(SE_Bio, cpmTh=CpmFilt, sampleTh=SampleFilt)
+SE_Filt$lib.size
+```
+
+#### 6.3 Normalize 
+
+ * Re-calculate library size and calculate TMM
+ * Calculate cpm and logCpm (with normalization) and store in SE_Filt
+
+```{r SE_norm, collapse=TRUE}
+SE_Filt <- normTmmSE(SE_Filt, useNormFactors=TRUE, priorCount=0.25)  
+```
+
+__After filtering out lowly-expressed genes, the dataset is structured in `r dim(SE_Filt)[1]` genes measured in `r dim(SE_Filt)[2]` samples.__ 
+
+****
+
+### 7. Diagnostic barplots on normalized data
+
+#### 7.1 Barplot for library size {.tabset}
+
+ * Barplot showing for each sample the initial library size; plot is centered on the mean value   
+ * Barplot with the same visualization after biotype selection and filtering on Cpm threshold    
+
+##### Library size **before** filtering
+
+```{r BarPlotLibraryI, fig.aling='center', fig.width=9, fig.height=5.5}
+librarySizeBarplot(SE, PlotTitle='Before Biotype Selection', Interactive=TRUE)
+```
+
+
+##### Library size **after** filtering
+
+```{r BarPlotLibraryII, fig.aling='center', fig.width=9, fig.height=5.5}
+#Extract ylim values from static plot to set them in the post filtering plot
+b1 <- librarySizeBarplot(SE, PlotTitle='Before Biotype Selection', Interactive=FALSE)
+lim_y <- layer_scales(b1)$y$range$range
+
+librarySizeBarplot(SE_Filt, PlotTitle='After Biotype Selection and Cpm Filtering', Interactive=TRUE, ylim=lim_y)
+```
+
+
+#### {-}
+
+```{r BarPlotLibrarySave, include=FALSE}
+ggsave(filename=paste0(OutputFolder, '/LibSize.pdf'), 
+  plot=gridExtra::grid.arrange(
+    librarySizeBarplot(SE, PlotTitle='Before Biotype Selection', Interactive=FALSE),
+    librarySizeBarplot(SE_Filt, PlotTitle='After Biotype Selection and Cpm Filtering', Interactive=FALSE), 
+    ncol=1), device='pdf', width=10, height=10)
+```
+
+
+#### 7.2 Barplot for TMM and expressed genes {.tabset}
+
+ * Barplot showing for each sample the TMM value as calculated by edgeR and used in the normalization  
+ * Barplot represents in each sample the number of 'expressed' genes. The evaluation is done on SE before the gene filtering step and applying the specified Cpm threshold separately to each sample.   
+
+
+##### TMM Barplot
+
+```{r BarPlotTMM, fig.align='center', fig.width=9, fig.height=5}
+tMMBarplot(SE_Filt, Interactive=TRUE)
+```
+
+```{r BarPlotTMMSave, include=FALSE}
+ggsave(filename=paste0(OutputFolder, '/TMM.pdf'), plot=tMMBarplot(SE_Filt, Interactive=FALSE), 
+       device='pdf', width=10, height=5)
+```
+
+
+##### Genes with Cpm higher than threshold
+
+```{r BarPlotExpGenes, fig.align='center', fig.width=9, fig.height=5}
+expressedGeneBarplot(SE, PlotTitle='Before Filtering', cpmth=CpmFilt, Interactive=TRUE)
+```
+
+
+```{r BarPlotExpGenesSave}
+ggsave(filename=paste0(OutputFolder, '/ExpressedGenes.pdf'), 
+       plot=expressedGeneBarplot(SE, PlotTitle='Before Filtering', cpmth=CpmFilt, Interactive=FALSE),
+       device='pdf', width=10, height=5)
+```
+#### {-}
+
+****
+
+
+
+### 8. Density plot for Count distribution after filtering 
+
+Similarly to raw counts, I represent by density plot the count distribution also after filtering.
+
+```{r DensityFilt, fig.align='center', fig.width=9, fig.height=4.5}
+readCountDensityplot(assays(SE_Filt)$counts, plotTitle='Filtered Dataset')
+```
+
+****
+
+
+
+### 9. Sample-to-sample correlation
+
+Correlation matrix across samples calculated on the basis of the Spearman correlation. Heatmap annotation takes into consideration sample 'Condition' by default. 
+
+```{r HeatmapSize, collapse=TRUE}
+# Set heatmap size on the basis of the number of samples
+Width <- 7 + (dim(SE_Filt)[2]- 8) * 0.24
+Width <- ifelse(Width<=14, Width, 14)
+Height <- 5 + (dim(SE_Filt)[2]- 8) * 0.22
+```
+
+```{r SampleCorrInteractive, fig.align='center', collapse=TRUE}
+#interactiveCorrHeatmap(SE_Filt, plotTitle='Filtered dataset', annotation_col=NULL, annotation_colors=NULL, myPalette=NULL) 
+```
+
+```{r SampleCorrSave, include=FALSE}
+ggsave(filename=paste0(OutputFolder, '/SampleCorr.pdf'), 
+       plot=sampleCorrHeatmap(SE_Filt, plotTitle='Filtered dataset', annotation_colors=NULL, display_numbers=TRUE),
+       device='pdf', width=Width, height=Height)
+```
+
+****
+
+### 10. Principal Component Analysis
+
+
+```{r PCACol, collapse=TRUE}
+Cols <- c('DMSO' = 'grey30', 'CTL' = 'azure3', 
+                 'AhHyd_Ag'='#F8766D', 'AhHyd_Inh'='#F8766D50',
+                 'Andr_Ag'='#fccb17', 'Andr_Inh'='#C49A0050',  
+                 "Estr_Ag"= '#53B400', "Estr_Inh"= '#53B40050', 
+                 'GC_Ag' = '#00C094', 'GC_Inh' = '#00C09450',
+                 'LivX_Ag' = '#00B6EB', 'LivX_Inh' = '#00B6EB50', 
+                 'Ret_Ag' = '#A58AFF', 'Ret_Inh' = '#A58AFF50', 
+                 'Thyr_Ag' = '#FB61D7', 'Thyr_Inh' = '#FB61D750'
+                 )
+```
+
+
+```{r PCA, fig.align='center', fig.width=9, fig.height=6.5}  
+pcaSE(SE_Filt, PlotTitle='First-Second Component', components=c(1,2), Interactive=TRUE, colVec = Cols)
+```
+
+```{r PCASave, collapse=TRUE, include=FALSE}  
+ggsave(filename=paste0(OutputFolder, '/DatasetPCA.pdf'),
+       plot=gridExtra::grid.arrange(
+         pcaSE(SE_Filt, PlotTitle='First-Second Component', components=c(1,2), Interactive=FALSE, colVec = Cols),
+         pcaSE(SE_Filt, PlotTitle='Second-Third Component', components=c(1,3), Interactive=FALSE, colVec = Cols),
+         ncol=2), device='pdf', width=8, height=5)
+```
+
+```{r PCA_run, fig.align='center', fig.width=9, fig.height=6.5} 
+SE_Filt@colData@listData[["SeqRun"]] <- as.character(SE_Filt@colData@listData[["SeqRun"]])
+pcaSE(SE_Filt, PlotTitle='First-Second Component', components=c(1,2), condition = "SeqRun" , Interactive=TRUE)
+```
+
+```{r PCA_runSave, collapse=TRUE, include=FALSE}  
+ggsave(filename=paste0(OutputFolder, '/DatasetPCA_run.pdf'),
+       plot=gridExtra::grid.arrange(
+         pcaSE(SE_Filt, PlotTitle='First-Second Component', components=c(1,2), condition = "SeqRun", Interactive=FALSE),
+         pcaSE(SE_Filt, PlotTitle='Second-Third Component', components=c(1,3), condition = "SeqRun", Interactive=FALSE),
+         ncol=2), device='pdf', width=8, height=5)
+```
+
+```{r PCA3D, fig.align='center', fig.width=8, fig.height=8, collapse=TRUE}
+pcaSE3d(SE_Filt, plotTitle='First-Third Components', colVec=Cols)
+```
+
+
+****
+
+### 11. Savings
+
+Saved objects 
+
+ * Intial SE without any filtering
+ * SE_Bio after biotype selection, but before expressed gene selection and normalization
+ * Analysis image
+
+```{r SaveSession}
+saveRDS(SE, paste0(OutputFolder, '/', Dataset, 'SE.rds')) 
+saveRDS(SE_Bio, paste0(OutputFolder, '/', Dataset, 'SE_Bio.rds')) 
+
+SessionInfo <- sessionInfo()
+Date <- date()
+save.image(paste0(OutputFolder, '/', Dataset, 'ExploratoryAnalysisWorkspace.RData'))
+```
+
+```{r SessionInfo}
+SessionInfo
+Date
+``` 

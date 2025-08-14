@@ -1,0 +1,100 @@
+---
+title: "to run EnrichmentBrowser outputs - CTL08"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+params: 
+    Dataset: 'CTL08'
+    Folder_EnrichBrow_markdown: '../EnrichmentBrowser/'
+    Folder_EnrichBrow_Output: '~/DataDir/bulkRNASeq/7.FunctionalAnalysis/CTL08/EnrichmentBrowser/'
+---
+
+# 1. Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setenv(R_LIBS = .libPaths()[1])
+```
+
+```{r folders, collapse=TRUE}
+Folder_EnrichBrow_markdown <- params$Folder_EnrichBrow_markdown #folder for EnrichmentBrowser html files
+Folder_EnrichBrow_Output <- params$Folder_EnrichBrow_Output #folder for EnrichmentBrowser outputs
+```
+
+```{r conditions, collapse=TRUE}
+Condition1 <- c("Thyr", "Andr", "Estr", "LivX", "AhHyd", "Ret", "GC") #pathway
+Condition2 <- c("Ag", "Inh", "AgvsInh") #effect+comparison
+```
+
+# 2. Creation of the function
+
+```{r function_html_generation, collapse=TRUE}
+generate_EnrichmentBrowser_html <- function(Folder_EnrichBrow_markdown, Folder_EnrichBrow_Output, Condition1, Condition2, cameraBoolean = TRUE, padogBoolean = TRUE){
+
+  xfun::Rscript_call(
+    
+    rmarkdown::render,
+    
+    list(input = paste0(Folder_EnrichBrow_markdown, "EnrichmentBrowser.Rmd"),
+        params = list(
+        OutputFolder = paste0(Folder_EnrichBrow_Output, Condition1, "/", Condition2, "/"), 
+        Condition_1 = Condition1,
+        Condition_2 = Condition2,
+        camera = cameraBoolean,
+        padog = padogBoolean), 
+        output_file=paste0("EnrichmentBrowser_", Condition1, "_", Condition2))
+  )
+}
+```
+
+# 3. Generation of EnrichmentBrowser html files for all conditions
+
+EnrichmentBrowser analysis is skipped for **Estrogen Inhibitor** and **AgvsInh** because all inhibitor samples were discarded for low-quality.
+
+The enrichment with padog is skipped when we have only 2 replicates because it fails. The conditions for what it occurs are:
+
+-   **Estrogen Agonist**
+
+-   **Retinoic Acid Inhibitor**
+
+-   **Glucocorticoid Inhibitor**
+
+For what concerns **GC AgvsInh** and **Ret AgvsInh** it was not possible to have any gene set-based enrichment analyses since also camera failed (in addition to failure of padog because they have less than 3 replicates).
+The problem with the model matrix occured also for **Aryl Hydrocarbon AgvsInh**, but at least for that one we could have used padog (\>2 replicates).
+
+```{r forloops, collapse=TRUE, include=FALSE}
+for (Cond1 in Condition1){
+    cat("Pathway:",Cond1)
+    
+    for (Cond2 in Condition2) {
+        print(Cond2)
+        
+        if (Cond1=="Estr" && (Cond2=="Inh" || Cond2 == "AgvsInh")){
+            print("No Estrogen Inhibitor samples for CTL08 (discarded because low-quality)")
+            next
+        } 
+        else if ((Cond1 =="GC" || Cond1 == "Ret") && Cond2 == "AgvsInh")
+          {
+          print("All gene set-based enrichment methods fail, only network-based analysis was already previously run")
+          next
+          }
+        else if ((Cond1 =="Estr" && Cond2 == "Ag") || (Cond1 =="GC" && Cond2 == "Inh") || 
+                 (Cond1 =="Ret" && Cond2 == "Inh"))
+          {
+          print("Padog for gene set-based enrichment fails, since these conditions have only 2 replicates. Therefore only camera will be used.")
+          generate_EnrichmentBrowser_html(Folder_EnrichBrow_markdown, Folder_EnrichBrow_Output, Condition1=Cond1, Condition2=Cond2, padogBoolean = FALSE)
+          }
+        else if (Cond1 =="AhHyd" && Cond2 == "AgvsInh")
+          {
+          print("Camera for gene set-based enrichment fails, for an error in the model matrix. Therefore only padog will be used.")
+          generate_EnrichmentBrowser_html(Folder_EnrichBrow_markdown, Folder_EnrichBrow_Output, Condition1=Cond1, Condition2=Cond2, cameraBoolean = FALSE)
+        }
+        else{generate_EnrichmentBrowser_html(Folder_EnrichBrow_markdown, Folder_EnrichBrow_Output, Condition1=Cond1, Condition2=Cond2)}
+          
+  }
+}
+```

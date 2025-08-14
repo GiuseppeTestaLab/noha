@@ -1,0 +1,2229 @@
+---
+title: "EndPoints hormonal treatment - CTL04"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'CTL04'
+    SE: '~/DataDir/bulkRNASeq/3.DataExploration/CTL04/Output/FemaleLineSE_Bio.rds'
+    OutputFolder: '~/DataDir/bulkRNASeq/5.DifferentialExpression/CTL04/'
+---
+
+##### Differential expression analysis on `r params$Dataset`.
+
+## 1. Environment Set Up
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+ 
+```{r EnvironmentSetupII, collapse=TRUE}
+library(DESeq2)
+library(SummarizedExperiment)
+library(ggplot2)
+library(sechm)
+library(ashr)
+library(gridExtra)
+```
+
+```{r FolderSetting}
+Dataset <- params$Dataset
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+ dir.create(OutputFolder, recursive=TRUE)
+}
+```
+
+
+****
+
+## 2. Data Upload
+
+### 2.1 SE object
+
+SE object created from exploratory analysis. Steps already performed: gene selection according to biotype.
+
+```{r, collapse=TRUE}
+SE_Bio <- readRDS(params$SE)
+```
+
+
+### 2.2 Discard duplicated gene names
+
+```{r, collapse=TRUE}
+SE_Bio <- SE_Bio[!duplicated(rowData(SE_Bio)$GeneName), ]
+rownames(SE_Bio) <- rowData(SE_Bio)$GeneName
+```
+
+### 2.3 Sample selection 
+
+Sample selection was not necessary.
+
+SE object containing information about `r dim(SE_Bio)[1]` genes in `r dim(SE_Bio)[2]` samples. 
+
+****
+
+## 3. Generation of dds
+
+```{r, collapse=TRUE}
+CountMatrix <- assays(SE_Bio)$counts
+SampleMeta <- DataFrame(colData(SE_Bio))
+
+if(! all(rownames(SampleMeta) == colnames(CountMatrix))){
+  stop('Inconsistency in count matrix and sample metadata')
+}
+```
+
+
+```{r, collapse=TRUE}
+dds <- DESeqDataSetFromMatrix(countData=assays(SE_Bio)$counts, SampleMeta, ~ Condition)
+
+# to add gene metadata
+mcols(dds) <- DataFrame(mcols(dds), DataFrame(rowData(SE_Bio)))
+
+dds
+```
+
+****
+
+## 4. Gene filtering
+
+### 4.1 Keep only protein-coding genes
+
+```{r, collapse=TRUE}
+keep <- mcols(dds)$GeneBiotype=="protein_coding"
+table(keep)
+dds <- dds[keep,]
+```
+
+### 4.2 Discard very lowly expressed genes
+
+```{r, collapse=TRUE}
+keep <- rowSums(counts(dds)>=30) >= 6
+
+table(keep)
+dds <- dds[keep,]
+
+dds
+```
+
+A dds object containing information about `r dim(dds)[1]` genes in `r dim(dds)[2]` samples is tested for differential expression. 
+
+
+****
+
+## 5. Standard DEA
+
+### 5.1 Size Factors
+
+```{r, collapse=TRUE}
+dds <- DESeq(dds)
+sizeFactors(dds)
+```
+
+```{r, collapse=TRUE}
+SF <-data.frame(Sample=names(sizeFactors(dds)), SizeF=sizeFactors(dds))
+
+ggplot(SF, aes(Sample, SizeF)) +
+  geom_point() + guides(x =  guide_axis(angle = 90)) +
+  ylim(0, 1.5)
+
+```
+
+### 5.2 Vst Transformation
+
+```{r, collapse=TRUE}
+SE_DEA <- as(dds, "RangedSummarizedExperiment")
+assays(SE_DEA)$vst <- assay(vst(dds, blind=TRUE))
+```
+
+```{r, collapse=TRUE}
+colData(SE_DEA)$Type <- factor(colData(SE_DEA)$Type, levels=c("CTL", "DMSO", "Agonist", "Inhibitor"))
+colData(SE_DEA)$Pathway <- factor(colData(SE_DEA)$Pathway, levels=c("None", "AhHyd", "Andr", "Estr", "GC", "LivX", "Ret", "Thyr"))
+
+metadata(SE_DEA)$anno_colors <- list(Pathway = c(AhHyd = "#C8C3A7", Andr = "#DBD294", Estr = "#E07A5F", GC = "#3D405B", LivX = "#81B29A", None = "grey", Ret = "#F2CC8F", Thyr = "#E59B24"), Type = c(DMSO='grey35', CTL= 'grey20',Agonist="#98A534", Inhibitor="#3E395C"), Condition = c('DMSO' = 'grey30', 'CTL' = 'azure3', 
+                 'AhHyd_Ag'='#F8766D', 'AhHyd_Inh'='#F8766D50',
+                 'Andr_Ag'='#fccb17', 'Andr_Inh'='#C49A0050',  
+                 "Estr_Ag"= '#53B400', "Estr_Inh"= '#53B40050', 
+                 'GC_Ag' = '#00C094', 'GC_Inh' = '#00C09450',
+                 'LivX_Ag' = '#00B6EB', 'LivX_Inh' = '#00B6EB50', 
+                 'Ret_Ag' = '#A58AFF', 'Ret_Inh' = '#A58AFF50', 
+                 'Thyr_Ag' = '#FB61D7', 'Thyr_Inh' = '#FB61D750'
+                 ))
+```
+
+
+### 5.3 Create List to store results
+
+```{r, collapse=TRUE}
+Treat <- levels(colData(SE_DEA)$Pathway)[-1]
+
+Treat
+```
+
+```{r, collapse=TRUE}
+DEA_Res <- list()
+
+for(i in 1:length(Treat)){
+  DEA_Res[[i]] <- list()}
+
+names(DEA_Res) <- Treat
+```
+
+****
+
+## 6. Thyroid treatment {.tabset}
+
+### 6.1 Thyroid Agonist vs DMSO
+
+```{r, collapse=TRUE}
+Path <- Treat[7]
+Path
+```
+
+#### 6.1.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Thyr_Ag", "DMSO"), alpha=0.01, cooksCutoff=0.90, independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 6.1.2 Fold-change shrinkage
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Thyr_Ag", "DMSO"),  type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+ 
+#### 6.1.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+S <- grepl('DMSO|Thyr', colnames(SE_DEA))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst",  gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols, do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 6.1.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Agonist$Res <- Res
+DEA_Res[[Path]]$Agonist$DEGs <- DEGs
+
+names(DEA_Res[[Path]])
+
+rm(Res, DEGs)
+```
+
+
+### 6.2 Thyroid Inhibitor vs DMSO
+
+
+#### 6.2.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Thyr_Inh", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 6.2.2 Fold-change shrinkage
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Thyr_Inh", "DMSO"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 6.2.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 6.2.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Inhibitor$Res <- Res
+DEA_Res[[Path]]$Inhibitor$DEGs <- DEGs
+
+names(DEA_Res[[Path]])
+
+rm(Res, DEGs)
+```
+
+
+### 6.3 Thyroid Agonist vs Inhibitor
+
+
+#### 6.3.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Thyr_Ag", "Thyr_Inh"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 6.3.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Thyr_Ag", "Thyr_Inh"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+
+
+#### 6.3.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 6.3.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$AgvsInh$Res <- Res
+DEA_Res[[Path]]$AgvsInh$DEGs <- DEGs
+
+names(DEA_Res[[Path]])
+
+rm(Res, DEGs)
+```
+
+****
+
+## 7. Retinoid treatment {.tabset}
+
+### 7.1 Retinoid Agonist vs DMSO
+
+```{r, collapse=TRUE}
+Path <- Treat[6]
+Path
+```
+
+
+#### 7.1.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Ret_Ag", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 7.1.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Ret_Ag", "DMSO"),  type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 7.1.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+S <- grepl('DMSO|Ret', colnames(SE_DEA))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:100,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols, show_rownames = TRUE,
+      do.scale=TRUE, breaks=0.8)
+```
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:100,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols, show_rownames = TRUE,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 7.1.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Agonist$Res <- Res
+DEA_Res[[Path]]$Agonist$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 7.2 Retinoid Antagonist vs DMSO
+
+
+#### 7.2.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Ret_Inh", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 7.2.2 Fold-change shrinkage
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Ret_Inh", "DMSO"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 7.2.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 7.2.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Inhibitor$Res <- Res
+DEA_Res[[Path]]$Inhibitor$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 7.3 Retinoic Agonist vs Inhibitor
+
+
+#### 7.3.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Ret_Ag", "Ret_Inh"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 7.3.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Ret_Ag", "Ret_Inh"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+
+#### 7.3.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+#### 7.3.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$AgvsInh$Res <- Res
+DEA_Res[[Path]]$AgvsInh$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+****
+
+## 8. LiverX treatment {.tabset}
+
+### 8.1 LiverX Agonist vs DMSO
+
+```{r, collapse=TRUE}
+Path <- Treat[5]
+Path
+```
+
+
+#### 8.1.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","LivX_Ag", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 8.1.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "LivX_Ag", "DMSO"),  type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 8.1.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+S <- grepl('DMSO|LivX', colnames(SE_DEA))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+#### 8.1.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Agonist$Res <- Res
+DEA_Res[[Path]]$Agonist$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 8.2 LiverX Inhibitor vs DMSO
+
+
+#### 8.2.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","LivX_Inh", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 8.2.2 Fold-change shrinkage
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "LivX_Inh", "DMSO"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 8.2.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 8.2.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Inhibitor$Res <- Res
+DEA_Res[[Path]]$Inhibitor$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+
+### 8.3 LiverX Agonist vs Inhibitor
+
+
+#### 8.3.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","LivX_Ag", "LivX_Inh"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 8.3.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "LivX_Ag", "LivX_Inh"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+
+#### 8.3.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+#### 8.3.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$AgvsInh$Res <- Res
+DEA_Res[[Path]]$AgvsInh$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+****
+
+## 9. Estrogen treatment {.tabset}
+
+### 9.1 Estrogen Agonist vs DMSO
+
+```{r, collapse=TRUE}
+Path <- Treat[3] 
+Path
+```
+
+
+#### 9.1.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Estr_Ag", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 9.1.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Estr_Ag", "DMSO"),  type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 9.1.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+S <- grepl('DMSO|Estr', colnames(SE_DEA))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 9.1.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Agonist$Res <- Res
+DEA_Res[[Path]]$Agonist$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 9.2 Estrogen Inhibitor vs DMSO
+
+#### 9.2.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Estr_Inh", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 9.2.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Estr_Inh", "DMSO"),  type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 9.2.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+S <- grepl('DMSO|Estr', colnames(SE_DEA))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 9.2.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Inhibitor$Res <- Res
+DEA_Res[[Path]]$Inhibitor$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 9.3 Estrogen Agonist vs Inhibitor
+
+#### 9.3.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Estr_Ag", "Estr_Inh"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 9.3.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Estr_Ag", "Estr_Inh"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+
+#### 9.3.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+#### 9.3.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$AgvsInh$Res <- Res
+DEA_Res[[Path]]$AgvsInh$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+****
+
+## 10. Androgen treatment {.tabset}
+
+### 10.1 Androgen Agonist vs DMSO
+
+```{r, collapse=TRUE}
+Path <- Treat[2]
+Path
+```
+
+
+#### 10.1.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Andr_Ag", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+
+#### 10.1.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Andr_Ag", "DMSO"),  type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 10.1.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+S <- grepl('DMSO|Andr', colnames(SE_DEA))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 10.1.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Agonist$Res <- Res
+DEA_Res[[Path]]$Agonist$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 10.2 Androgen Inhibitor vs DMSO
+
+
+#### 10.2.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Andr_Inh", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 10.2.2 Fold-change shrinkage
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Andr_Inh", "DMSO"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 10.2.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 10.2.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Inhibitor$Res <- Res
+DEA_Res[[Path]]$Inhibitor$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 10.3 Androgen Agonist vs Inhibitor
+
+
+#### 10.3.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","Andr_Ag", "Andr_Inh"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 10.3.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "Andr_Ag", "Andr_Inh"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+
+#### 10.3.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+#### 10.3.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$AgvsInh$Res <- Res
+DEA_Res[[Path]]$AgvsInh$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+****
+
+## 11. Glucocorticoid treatment {.tabset}
+
+### 11.1 Glucocorticoid Agonist vs DMSO
+
+```{r, collapse=TRUE}
+Path <- Treat[4]
+Path
+```
+
+
+#### 11.1.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","GC_Ag", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+
+#### 11.1.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "GC_Ag", "DMSO"),  type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 11.1.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+S <- grepl('DMSO|GC', colnames(SE_DEA))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 11.1.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Agonist$Res <- Res
+DEA_Res[[Path]]$Agonist$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 11.2 Glucocorticoid Inhibitor vs DMSO
+
+
+#### 11.2.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","GC_Inh", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 11.2.2 Fold-change shrinkage
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "GC_Inh", "DMSO"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 11.2.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 11.2.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Inhibitor$Res <- Res
+DEA_Res[[Path]]$Inhibitor$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 11.3 Glucocorticoid Agonist vs Inhibitor
+
+
+#### 11.3.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","GC_Ag", "GC_Inh"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+
+#### 11.3.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "GC_Ag", "GC_Inh"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+
+#### 11.3.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+#### 11.3.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$AgvsInh$Res <- Res
+DEA_Res[[Path]]$AgvsInh$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+****
+
+## 12. Arhyl Hydrocarbon treatment {.tabset}
+
+### 12.1 Arhyl Hydrocarbon Agonist vs DMSO
+
+```{r, collapse=TRUE}
+Path <- Treat[1]
+Path
+```
+
+
+#### 12.1.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","AhHyd_Ag", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 12.1.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "AhHyd_Ag", "DMSO"),  type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 12.1.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+S <- grepl('DMSO|AhHyd', colnames(SE_DEA))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+#### 12.1.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Agonist$Res <- Res
+DEA_Res[[Path]]$Agonist$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 12.2 Arhyl Hydrocarbon Inhibitor vs DMSO
+
+
+#### 12.2.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","AhHyd_Inh", "DMSO"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 12.2.2 Fold-change shrinkage
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "AhHyd_Inh", "DMSO"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+#### 12.2.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+
+#### 12.2.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$Inhibitor$Res <- Res
+DEA_Res[[Path]]$Inhibitor$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+### 12.3 Arhyl Hydrocarbon Agonist vs Inhibitor
+
+
+#### 12.3.1 DEA
+
+```{r, collapse=TRUE}
+res <- results(dds, contrast=c("Condition","AhHyd_Ag", "AhHyd_Inh"), alpha=0.01, cooksCutoff=0.90,  independentFiltering=FALSE)
+summary(res)
+```
+
+
+#### 12.3.2 Fold-change shrinkage
+
+
+```{r, collapse=TRUE}
+Res <- lfcShrink(dds, contrast=c("Condition", "AhHyd_Ag", "AhHyd_Inh"), res=res, type="ashr")
+  
+summary(Res)
+rm(res)
+
+head(Res[order(Res$padj),])
+```
+
+ * Genes modulated considering a threshold of 0.05 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.05))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.05 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.05, abs(log2FoldChange)>1))[1]`
+ 
+ * Genes modulated considering a threshold of 0.01 on the FDR: `r dim(dplyr::filter(data.frame(Res), padj < 0.01))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 1.5 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(1.5)))[1]`
+ * Genes modulated considering a threshold of 0.01 on the FDR and of 2 on the FC: `r dim(dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>1))[1]`
+
+
+#### 12.3.3 Visualization
+
+__Heatmap selected samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+DEGs <- dplyr::filter(data.frame(Res), padj < 0.01, abs(log2FoldChange)>log2(2))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+sechm::sechm(SE_DEA[,S], features=row.names(DEGs[order(DEGs$padj), ]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__Heatmap all samples__
+
+```{r, fig.width=16, fig.height=12, collapse=TRUE}
+sechm::sechm(SE_DEA, features=row.names(DEGs[order(DEGs$padj), ][1:1000,]), assayName="vst", gaps_at="Condition",  top_annotation=c('Condition'), hmcols=ScaledCols,
+      do.scale=TRUE, breaks=0.8)
+```
+
+__MA Plot__
+
+```{r fig.width=5, fig.height=4}
+DESeq2::plotMA(Res, ylim=c(-4,4))
+```
+
+__Counts__
+
+```{r, fig.height=20, fig.width=20}
+plot_list = list()
+
+for(i in 1:12){
+  d <-plotCounts(dds, gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition",  returnData=TRUE)
+  p <- ggplot(d, aes(x = Condition, y = count, color = Condition)) +
+    geom_point(position=position_jitter(w = 0.1,h = 0)) +
+    scale_x_discrete(guide = guide_axis(angle = 45)) +
+    theme_bw() + ggtitle(row.names(Res[order(Res$padj), ])[i]) + theme(plot.title = element_text(hjust = 0.5))
+  plot_list[[i]] <- p
+}
+grid.arrange(grobs = plot_list)
+
+#  par(mfrow=c(3,4))
+# 
+# #grepl(Path, colnames(SE_DEA))
+# 
+# for(i in 1:12){
+#   plotCounts(dds[, grepl(Path, colnames(SE_DEA))], gene=row.names(Res[order(Res$padj), ])[i], intgroup="Condition")
+# }
+
+```
+
+#### 12.3.4 Store Results
+
+```{r, collapse=TRUE, fig.height=6, fig.width=10}
+DEA_Res[[Path]]$AgvsInh$Res <- Res
+DEA_Res[[Path]]$AgvsInh$DEGs <- DEGs
+
+rm(Res, DEGs)
+```
+
+
+****
+
+## 13. Savings
+
+```{r SaveRDS}
+saveRDS(DEA_Res, paste0(OutputFolder, '/', 'DEARes.rds'))
+saveRDS(SE_DEA, paste0(OutputFolder, '/', 'SE_DEA.rds'))
+```
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+save.image(paste0(OutputFolder, '/', 'DEA_CTL04.RData'))
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+``` 
+
+
+
+

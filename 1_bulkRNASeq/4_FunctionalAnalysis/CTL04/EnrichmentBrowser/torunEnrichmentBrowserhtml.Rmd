@@ -1,0 +1,63 @@
+---
+title: "to run EnrichmentBrowser outputs - CTL04"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+params: 
+    Folder_EnrichBrow_markdown: '../EnrichmentBrowser/'
+    Folder_EnrichBrow_Output: '~/DataDir/bulkRNASeq/7.FunctionalAnalysis/CTL04/EnrichmentBrowser/'
+---
+
+# 1. Setup
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+Sys.setenv(R_LIBS = .libPaths()[1])
+```
+
+```{r folders, collapse=TRUE}
+Folder_EnrichBrow_markdown <- params$Folder_EnrichBrow_markdown #folder for EnrichmentBrowser html files
+Folder_EnrichBrow_Output <- params$Folder_EnrichBrow_Output #folder for EnrichmentBrowser outputs
+```
+
+```{r conditions, collapse=TRUE}
+Condition1 <- c("Thyr", "Andr", "Estr", "LivX", "GC", "AhHyd", "Ret") #pathway
+Condition2 <- c("Ag", "Inh", "AgvsInh") #effect+comparison
+```
+
+# 2. Creation of the function
+
+```{r function_html_generation, collapse=TRUE}
+generate_EnrichmentBrowser_html <- function(Folder_EnrichBrow_markdown, Folder_EnrichBrow_Output, Condition1, Condition2){
+
+  xfun::Rscript_call(
+    
+    rmarkdown::render,
+    
+    list(input = paste0(Folder_EnrichBrow_markdown, "EnrichmentBrowser.Rmd"),
+        params = list(
+        OutputFolder = paste0(Folder_EnrichBrow_Output, Condition1, "/", Condition2, "/"), 
+        Condition_1 = Condition1,
+        Condition_2 = Condition2),
+        output_file=paste0("EnrichmentBrowser_", Condition1, "_", Condition2))
+  )
+}
+```
+
+# 3. Generation of EnrichmentBrowser html files for all conditions
+
+```{r forloops, collapse=TRUE, include=FALSE}
+for (Cond1 in Condition1){
+    cat("Pathway:",Cond1)
+    
+    for (Cond2 in Condition2) {
+        print(Cond2)
+      generate_EnrichmentBrowser_html(Folder_EnrichBrow_markdown, Folder_EnrichBrow_Output, Condition1=Cond1, Condition2=Cond2)
+    }
+}
+```
+

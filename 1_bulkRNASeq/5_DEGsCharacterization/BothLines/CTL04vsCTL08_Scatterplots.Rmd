@@ -1,0 +1,226 @@
+---
+title: "EndPoints hormonal treatment - Scatterplots CTL04 vs CTL08 DEGs"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    DEA_CTL04: '~/DataDir/bulkRNASeq/5.DifferentialExpression/CTL04/DEARes.rds'
+    DEA_CTL08: '~/DataDir/bulkRNASeq/5.DifferentialExpression/CTL08/DEARes.rds'
+    OutputFolder: '~/DataDir/bulkRNASeq/9.DEGsCharacterization/BothLines/'
+---
+
+# 1. Environment Set Up
+
+Values of RMarkdown parameters
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, collapse = TRUE)
+```
+
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(RNASeqBulkExploratory)  #Our Package
+library(ggplot2)
+library(gridExtra)
+library(dplyr)
+```
+
+```{r, collapse=TRUE}
+DEA_CTL08 <- readRDS(params$DEA_CTL08)
+DEA_CTL04 <- readRDS(params$DEA_CTL04)
+```
+
+Saving DEGs into excel files with DEGs from each comparison (AgvsInh) in separate sheets (ordered by adjusted p-value).
+
+```{r}
+list_DEGs_CTL04 <- vector("list", length(names(DEA_CTL04))) %>% setNames(names(DEA_CTL04))
+
+for (Cond in names(list_DEGs_CTL04)) {
+  list_DEGs_CTL04[[Cond]] <- DEA_CTL04[[Cond]]$AgvsInh$DEGs %>% arrange(padj)
+}
+
+list_DEGs_CTL04 <- list_DEGs_CTL04 %>% setNames(paste0("DEGs_", names(list_DEGs_CTL04), "_AgvsInh"))
+
+openxlsx::write.xlsx(list_DEGs_CTL04, paste0(params$OutputFolder, "DEGs_CTL04_AgvsInh.xlsx"), rowNames = TRUE, headerStyle = openxlsx::createStyle(textDecoration = "Bold"))
+```
+
+```{r}
+list_DEGs_CTL08 <- vector("list", length(names(DEA_CTL04))) %>% setNames(names(DEA_CTL04)) #keep CTL04 to have the same order in the final file
+
+for (Cond in names(list_DEGs_CTL08)[names(list_DEGs_CTL08) != "Estr"]) {
+  list_DEGs_CTL08[[Cond]] <- DEA_CTL08[[Cond]]$AgvsInh$DEGs %>% arrange(padj)
+}
+
+list_DEGs_CTL08 <- list_DEGs_CTL08 %>% setNames(paste0("DEGs_", names(list_DEGs_CTL08), "_AgvsInh"))
+
+#We do not have Estr Inh so we will save only DEGs AgvsDMSO
+list_DEGs_CTL08[[grep("Estr", names(list_DEGs_CTL08))]] <- DEA_CTL08[["Estr"]]$Agonist$DEGs %>% arrange(padj)
+names(list_DEGs_CTL08)[[grep("Estr", names(list_DEGs_CTL08))]] <- "DEGs_Estr_AgvsDMSO"
+
+openxlsx::write.xlsx(list_DEGs_CTL08, paste0(params$OutputFolder, "DEGs_CTL08_AgvsInh.xlsx"), rowNames = TRUE, headerStyle = openxlsx::createStyle(textDecoration = "Bold"))
+```
+
+# 2. Retinoic acid overlap CTL04 vs CTL08 {.tabset}
+## agonist
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$Ret$Agonist$Res, DEA_CTL04$Ret$Agonist$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000, padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$Ret$Agonist$Res, DEA_CTL04$Ret$Agonist$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 8, padjceil = 0, Interactive = TRUE)
+```
+
+## agonist vs inhibitor
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$Ret$AgvsInh$Res, DEA_CTL04$Ret$AgvsInh$Res, LogFCth = 1, padjth = 0.01 , LogFCceil = 1000, padjceil = 0)$topGenes
+```
+
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$Ret$AgvsInh$Res, DEA_CTL04$Ret$AgvsInh$Res, LogFCth = 1, padjth = 0.01 , LogFCceil = 8, padjceil = 0, Interactive = TRUE)
+```
+
+# 3. Thyroid overlap CTL04 vs CTL08 {.tabset}
+## agonist
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$Thyr$Agonist$Res, DEA_CTL04$Thyr$Agonist$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000,padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$Thyr$Agonist$Res, DEA_CTL04$Thyr$Agonist$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+## agonist vs inhibitor
+
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$Thyr$AgvsInh$Res, DEA_CTL04$Thyr$AgvsInh$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000,padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$Thyr$AgvsInh$Res, DEA_CTL04$Thyr$AgvsInh$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+# 4. Estrogen overlap CTL04 vs CTL08 {.tabset}
+## agonist
+
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$Estr$Agonist$Res, DEA_CTL04$Estr$Agonist$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000,padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$Estr$Agonist$Res, DEA_CTL04$Estr$Agonist$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+Absent/low quality samples for estrogen inhibitor CTL08 
+
+
+# 5. Androgen overlap CTL04 vs CTL08 {.tabset}
+## agonist
+
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$Andr$Agonist$Res, DEA_CTL04$Andr$Agonist$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000,padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$Andr$Agonist$Res, DEA_CTL04$Andr$Agonist$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+## agonist vs inhibitor
+
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$Andr$AgvsInh$Res, DEA_CTL04$Andr$AgvsInh$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000, padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$Andr$AgvsInh$Res, DEA_CTL04$Andr$AgvsInh$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+
+# 6. Glucocorticoid overlap CTL04 vs CTL08 {.tabset}
+## agonist
+
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$GC$Agonist$Res, DEA_CTL04$GC$Agonist$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000, padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$GC$Agonist$Res, DEA_CTL04$GC$Agonist$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+## agonist vs inhibitor
+
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$GC$AgvsInh$Res, DEA_CTL04$GC$AgvsInh$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, LogFCceil = 1000)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$GC$AgvsInh$Res, DEA_CTL04$GC$AgvsInh$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, LogFCceil = 6, Interactive = TRUE)
+```
+
+
+# 7. AhHyd overlap CTL04 vs CTL08 {.tabset}
+## agonist
+
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$AhHyd$Agonist$Res, DEA_CTL04$AhHyd$Agonist$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000, padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$AhHyd$Agonist$Res, DEA_CTL04$AhHyd$Agonist$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+## agonist vs inhibitor
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$AhHyd$AgvsInh$Res, DEA_CTL04$AhHyd$AgvsInh$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000, padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$AhHyd$AgvsInh$Res, DEA_CTL04$AhHyd$AgvsInh$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+
+# 8. LiverX overlap CTL04 vs CTL08 {.tabset}
+## agonist
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$LivX$Agonist$Res, DEA_CTL04$LivX$Agonist$Res, LogFCth = 1, padjth = 0.01, LogFCceil = 1000, padjceil = 0)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$LivX$Agonist$Res, DEA_CTL04$LivX$Agonist$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+## agonist vs inhibitor
+
+```{r, collapse=TRUE}
+computeCompResFC(DEA_CTL08$LivX$AgvsInh$Res, DEA_CTL04$LivX$AgvsInh$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, LogFCceil = 1000)$topGenes
+```
+
+```{r, collapse=TRUE}
+compResFScatter(DEA_CTL08$LivX$AgvsInh$Res, DEA_CTL04$LivX$AgvsInh$Res, LogFCth = 1, padjth = 0.01, padjceil = 0, Interactive = TRUE)
+```
+
+```{r}
+date()
+sessionInfo()
+```
+

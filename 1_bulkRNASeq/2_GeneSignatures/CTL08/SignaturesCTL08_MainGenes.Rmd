@@ -1,0 +1,318 @@
+---
+title: "EndPoints CTL08: Main Gene Signatures"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'CTL08'
+    SE: '~/DataDir/bulkRNASeq/3.DataExploration/CTL08/Output/AfterSamplesSelection/MaleLineSE_Bio.rds'
+    OutputFolder: '~/DataDir/bulkRNASeq/4.GeneSignatures/CTL08/Output/AfterSamplesSelection/MainSig/'
+    CpmFilt: 2
+    SampleFilt: 4
+
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE)
+```
+
+### Checking gene signatures on `r params$Dataset`
+
+## 1. Environment Set Up
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+ 
+```{r EnvironmentSetupII, collapse=TRUE}
+library(RNASeqBulkExploratory)  #Our Package
+library(DT)
+library(gridExtra)
+library(SummarizedExperiment)
+library(SEtools)
+library(sechm)
+library(randomcoloR)
+library(ggplot2)
+library(tidyHeatmap)
+```
+
+```{r FolderSetting}
+Dataset <- params$Dataset
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+  dir.create(OutputFolder, recursive=FALSE)
+}
+```
+
+
+****
+
+## 2. Data Upload
+
+### 2.1 SE object
+
+SE object created from exploratory analysis. Steps already performed: gene selection according to biotype.
+
+
+```{r, collapse=TRUE}
+SE_Bio <- readRDS(params$SE)
+```
+
+SE object containing information about `r dim(SE_Bio)[1]` genes in `r dim(SE_Bio)[2]` samples. 
+
+```{r}
+if(! identical(names(assays(SE_Bio)$counts), rownames(colData(SE_Bio)))){
+  stop('Inconsistencies in sample metadata for SE object')
+  }
+
+if(! identical(names(assays(SE_Bio)$counts), colData(SE_Bio)$HRID)){
+  stop('Inconsistencies in sample metadata for SE object')
+  }
+
+```
+
+
+### 2.2 Gene Lenght
+
+```{r, collapse=TRUE}
+GeneLength <- read.table(file = '~/DataDir/bulkRNASeq/1.GeneLength/Output/GenecodeV35GeneLength.txt', 
+                         sep='\t', header=TRUE)
+```
+
+
+```{r, collapse=TRUE}
+SelLenght <- dplyr::left_join(as.data.frame(rowData(SE_Bio))[,1:3], GeneLength, by=c('Gene'='Gene'))
+```
+
+
+```{r, collapse=TRUE}
+if(identical(SelLenght$Gene, rowData(SE_Bio)$Gene)){
+  rowData(SE_Bio)$GeneLength <- SelLenght$Length
+  print('Gene Lengh information added to SE')
+} else {
+    print('Information on gene lenght is not compatible with SE object. Gene Lenght information not added to SE')
+  }
+```
+
+### 2.3 Gene Signatures
+
+```{r, collapse=TRUE}
+GS <- read.table(file = '~/DataDir/bulkRNASeq/4.GeneSignatures/GeneSets/MainSignature.txt', 
+                         sep='\t', header=TRUE)
+names(GS)[2] <- 'Population'
+
+table(GS$Population)
+```
+
+
+****
+
+## 3. Selecting and filtering
+
+### 3.1 Sample Selection
+
+Already performed.
+
+### 3.2 Gene Filtering
+
+#### 3.2.1 Setting gene filtering thresholds
+
+```{r FiltThresholds, collapse=TRUE}
+CpmFilt <- params$CpmFilt
+if(is.numeric(CpmFilt)==FALSE){
+  stop('ERROR! Cpm threshold for gene filtering has a non-numeric value')
+}
+
+SampleFilt <- ifelse(params$SampleFilt=='Default', dim(SE_Bio)[2]/2, params$SampleFilt)
+if(is.numeric(SampleFilt)==FALSE){
+  stop('ERROR! Sample threshold for gene filtering has a non-numeric value')
+}
+```
+
+__Genes having an expression lower than `r CpmFilt` in at least `r SampleFilt` samples are filtered out.__
+
+
+#### 3.2.2 Filter out low expressed genes
+
+ * Compute temporary cpm (without TMM normalization, not stored in SE)
+ * Filter out lowly-expressed genes
+
+
+```{r SE_Filt, collapse=TRUE}
+SE_Bio$lib.size
+SE_Filt <- filterSE(SE_Bio, cpmTh=CpmFilt, sampleTh=SampleFilt)
+```
+
+
+#### 3.2.3 Normalize 
+
+ * Re-calculate library size and calculate TMM
+ * Calculate cpm and logcpm (with normalization) and store in SE_Filt
+ * Calculate Fpkm and logfpkm
+
+```{r SE_norm, collapse=TRUE}
+SE_Filt <- normTmmSE(SE_Filt, useNormFactors=TRUE, priorCount=0.25)  
+
+assays(SE_Filt)$fpkm <- edgeR::rpkm(SE_Filt, normalized.lib.sizes = TRUE, gene.length=rowData(SE_Filt)$GeneLength)
+assays(SE_Filt)$logfpkm <- edgeR::rpkm(SE_Filt, normalized.lib.sizes = TRUE, gene.length=rowData(SE_Filt)$GeneLength, 
+                                  log=TRUE, prior.count=0.25)
+```
+
+__After filtering out lowly-expressed genes, the dataset is structured in `r dim(SE_Filt)[1]` genes measured in `r dim(SE_Filt)[2]` samples.__ 
+
+
+****
+
+
+## 4. Heatmaps: pre-processing
+
+
+### 4.1 Gene name as row names
+
+```{r, collapse=TRUE}
+rownames(SE_Filt) <- rowData(SE_Filt)$GeneName
+SE_Filt <- SE_Filt[!duplicated(rownames(SE_Filt)), ] 
+```
+
+### 4.2 Calculate the fold-change 
+
+Calculate the fold-change compared to the controls (DMSO). This is done on logcpm.
+
+```{r, collapse=TRUE}
+DMSO <- as.vector(which(SE_Filt$Condition=='DMSO'))
+SE_Filt <- SEtools::log2FC(SE_Filt, fromAssay='logcpm', controls=DMSO, isLog=TRUE, toAssay='log2FC')
+```
+
+
+### 4.3 Define the color annotation 
+
+```{r, collapse=TRUE}
+colData(SE_Filt)$Condition <- factor(colData(SE_Filt)$Condition, levels=c("CTL", "DMSO", "AhHyd_Ag", "AhHyd_Inh", "Andr_Ag", "Andr_Inh", "Estr_Ag", "Estr_Inh", "GC_Ag", "GC_Inh", "LivX_Ag", "LivX_Inh", "Ret_Ag", "Ret_Inh", "Thyr_Ag", "Thyr_Inh" ))
+
+metadata(SE_Filt)$anno_colors <- list(Condition = c('DMSO' = 'grey30', 'CTL' = 'azure3', 
+
+                 'AhHyd_Ag'='#F8766D', 'AhHyd_Inh'='#F8766D50',
+
+                 'Andr_Ag'='#fccb17', 'Andr_Inh'='#C49A0050',  
+
+                 "Estr_Ag"= '#53B400', "Estr_Inh"= '#53B40050', 
+
+                 'GC_Ag' = '#00C094', 'GC_Inh' = '#00C09450',
+
+                 'LivX_Ag' = '#00B6EB', 'LivX_Inh' = '#00B6EB50', 
+
+                 'Ret_Ag' = '#A58AFF', 'Ret_Inh' = '#A58AFF50', 
+
+                 'Thyr_Ag' = '#FB61D7', 'Thyr_Inh' = '#FB61D750'
+
+                 )
+ , SeqRun = c("20210310" = "orange", "20210724"  = "green4", "20220422" = 
+                                          "#66ACB7"))
+```
+
+****
+
+## 5. Heatmaps
+
+### 5.1 Gene signature 
+
+```{r, collapse=TRUE}
+Genes <- GS %>% dplyr::pull(GeneName)
+
+Genes[! Genes %in% row.names(SE_Filt)]
+
+rowData(SE_Filt)$Signatures <- NA
+for (i in which(rowData(SE_Filt)$GeneName %in% Genes)){
+  gene <- row.names(SE_Filt)[i]
+  rowData(SE_Filt)[i, 'Signatures'] <-GS[GS$GeneName==gene, "Population"]
+}
+
+#color for signatures
+rowData(SE_Filt)$Signatures <- factor(rowData(SE_Filt)$Signatures, levels=c("Cycling", "NSC", "ApicalProg", "IntermProg", "oRG", "PanNeuron", "ExcN", "InhN", "LowLayerN", "UpLayerN", "PostSynaptic", "Astrocyte", "Oligo"))
+
+metadata(SE_Filt)$anno_colors$Signatures <- c(ApicalProg = "#e6194b", Astrocyte = "#4363d8", Cycling = "#46f0f0", ExcN = "#e6beff", InhN = "#9a6324", IntermProg = "#aaffc3", LowLayerN = "#000075", NSC = "#84b37d", Oligo = "#9a499a", oRG = "#f2802c", PanNeuron = "#4ba0be", PostSynaptic = "#dff3e4", UpLayerN = "#b2ec94")
+
+#color for heatmaps
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+```
+
+__The following genes are not selected as expressed:__ `r paste(Genes[! Genes %in% row.names(SE_Filt)])`. 
+
+
+### 5.2 Expression levels: logfpkm without scaling
+
+```{r , collapse=TRUE, fig.width=15, fig.height=15}
+break_coord <- assays(SE_Filt[row.names(SE_Filt) %in% Genes, ])$logfpkm %>% quantile(seq(0,1, by=0.1))
+ExpCols <- viridisLite::cividis(length(seq(head(break_coord,1), tail(break_coord,1), by=0.2)))
+
+p1 <- sechm::sechm(SE_Filt, features=Genes, assayName="logfpkm", gaps_at = "Condition", gaps_row="Signatures", top_annotation = c("Condition", "SeqRun"), show_rownames = TRUE, left_annotation = c("Signatures"), sortRowsOn=NULL, cluster_rows=FALSE, cluster_cols = FALSE,  show_colnames=TRUE, hmcols=ExpCols, breaks=seq(head(break_coord,1), tail(break_coord,1), by=0.2), column_title = "Logfpkm", row_title_rot = 0)
+# breaks FALSE to avoid a symmetrical scale
+p1
+```
+
+Saving to PDF file
+
+```{r , collapse=TRUE, include=FALSE}
+tidyHeatmap::save_pdf(p1, filename=paste0(OutputFolder, 'LogFpkm.pdf'), width=15, height=15)
+```
+
+### 5.3 Expression levels: scaled logfpkm
+
+```{r collapse=TRUE, include=FALSE}
+GS_Exp <- assays(SE_Filt[row.names(SE_Filt) %in% Genes, ])$logfpkm
+#GS_Exp
+```
+
+```{r , collapse=TRUE, fig.width=15, fig.height=15}
+p2 <- sechm::sechm(SE_Filt, features=Genes, assayName="logfpkm", gaps_at = "Condition", gaps_row="Signatures", top_annotation = c("Condition", "SeqRun"), show_rownames = TRUE, left_annotation = c("Signatures", "UpregulatedBy", "DownregulatedBy"), sortRowsOn=NULL, cluster_rows=FALSE, cluster_cols = FALSE,  show_colnames=TRUE, hmcols=ScaledCols, do.scale=TRUE, breaks=0.8, column_title = "Scaled Logfpkm", row_title_rot = 0)
+p2
+```
+
+Saving to PDF file
+
+```{r , collapse=TRUE, include=FALSE}
+tidyHeatmap::save_pdf(p2, filename=paste0(OutputFolder, 'ScaledLogfpkm.pdf'), width=15, height=15)
+```
+
+### 5.4 Expression levels: Log2FC versus DMSO
+
+```{r ,    collapse=TRUE,  fig.width=15, fig.height=15}
+p3 <- sechm::sechm(SE_Filt, features=Genes, assayName="log2FC", gaps_at = "Condition", gaps_row="Signatures", top_annotation = c("Condition", "SeqRun"), show_rownames = TRUE, left_annotation = c("Signatures", "UpregulatedBy", "DownregulatedBy"), sortRowsOn=NULL, cluster_rows=FALSE, cluster_cols = FALSE,  show_colnames=TRUE, hmcols=ScaledCols, 
+      do.scale=FALSE, breaks = 0.85, column_title = "LogFC versus DMSO", row_title_rot = 0)
+p3
+```
+
+Saving to PDF file
+
+```{r , collapse=TRUE, include=FALSE}
+tidyHeatmap::save_pdf(p3, filename=paste0(OutputFolder, 'LogFC.pdf'), width=15, height=15)
+```
+
+
+## 6. Savings
+
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+save.image(paste0(OutputFolder, '/', Dataset, 'SigMain_Workspace.RData'))
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+``` 
+
+
+
+
+
+

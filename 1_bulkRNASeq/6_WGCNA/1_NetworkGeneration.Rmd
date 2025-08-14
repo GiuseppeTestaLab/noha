@@ -1,0 +1,389 @@
+---
+title: "EndPoints hormonal treatment - CTL04 WGCNA"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'CTL04'
+    SE: '~/DataDir/bulkRNASeq/3.DataExploration/CTL04/Output/FemaleLineSE.rds'
+    OutputFolder: '~/DataDir/bulkRNASeq/8.WGCNA/CTL04/1_NetworkGeneration/'
+---
+
+##### WGCNA on `r params$Dataset`.
+
+
+## 1. Environment Set Up
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, collapse = TRUE)
+```
+
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+ 
+```{r EnvironmentSetupII, collapse=TRUE}
+library(RNASeqBulkExploratory) 
+library(DESeq2)
+library(WGCNA)
+```
+
+```{r FolderSetting}
+Dataset <- params$Dataset
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+ dir.create(OutputFolder, recursive=TRUE)
+}
+```
+
+
+****
+
+## 2. Data Upload
+
+### 2.1 SE object
+
+
+```{r, collapse=TRUE}
+SE <- readRDS(params$SE)
+```
+
+
+### 2.2 Biotype selection and discard duplicated gene names
+
+To avoid issues with downstream computations and not/unique rows, discard duplicated gene names and then set gene name as rowname.
+
+```{r BiotypeSel, collapse=TRUE}
+SE_Bio <- RNASeqBulkExploratory::biotypeSelectSE(SE, lncRNA=TRUE, otherBios=NULL, showRemoved=TRUE)
+
+RemovedGenes <-  rowData(SE)[!(rownames(rowData(SE)) %in% rownames(rowData(SE_Bio))), ]
+```
+
+**After the gene selection based on biotypes (protein-coding and lncRNAs), the dataset is structured in `r dim(SE_Bio)[1]` genes measured in `r dim(SE_Bio)[2]` samples. `r dim(RemovedGenes)[1]` have been discarded.**
+
+```{r, collapse=TRUE}  
+SE_Bio <- SE_Bio[!duplicated(rowData(SE_Bio)$GeneName), ]
+rownames(SE_Bio) <- rowData(SE_Bio)$GeneName
+```
+
+### 2.3 Sample selection 
+
+All samples are kept for downstream analyses
+
+SE object containing information about `r dim(SE_Bio)[1]` genes in `r dim(SE_Bio)[2]` samples. 
+
+
+### 2.4 Sample Metadata and dummy variables
+
+```{r}
+DummyTraits <- colData(SE_Bio)[,c(2, 5, 7, 8)]
+
+
+# Treatment
+for(level in unique(factor(DummyTraits$Condition))){
+  DummyTraits[paste("Treat", level, sep = "_")] <- ifelse(DummyTraits$Condition == level, 1, 0)
+}
+
+# Pathway
+for(level in unique(factor(DummyTraits$Pathway))){
+  DummyTraits[paste("Path", level, sep = "_")] <- ifelse(DummyTraits$Pathway == level & DummyTraits$Type == 'Agonist', 1,
+                                                         ifelse(DummyTraits$Pathway == level & DummyTraits$Type == 'Inhibitor', -1, NaN))
+                                                         }
+
+```
+
+****
+
+## 3. Generation of dds
+
+
+```{r, collapse=TRUE}
+CountMatrix <- assays(SE_Bio)$counts
+SampleMeta <- DataFrame(colData(SE_Bio))
+
+if(! all(rownames(SampleMeta) == colnames(CountMatrix))){
+  stop('Inconsistency in count matrix and sample metadata')
+}
+```
+
+
+```{r, collapse=TRUE}
+dds <- DESeqDataSetFromMatrix(countData=assays(SE_Bio)$counts, SampleMeta, ~ Condition)
+
+# to add gene metadata
+mcols(dds) <- DataFrame(mcols(dds), DataFrame(rowData(SE_Bio)))
+
+dds
+```
+
+****
+
+## 4. Gene filtering
+
+
+Threshold of expression of at least 40 counts in at least 4 samples.
+
+```{r, collapse=TRUE}
+keep <- rowSums(counts(dds)>=40) >= 4
+
+table(keep)
+dds <- dds[keep,]
+
+dds
+```
+
+A dds object containing information about `r dim(dds)[1]` genes in `r dim(dds)[2]` samples is tested for differential expression. 
+
+
+****
+
+## 5. Data wrangling
+
+### 5.1 Size Factor calculation
+
+```{r, collapse=TRUE}
+dds <- DESeq(dds)
+sizeFactors(dds)
+```
+
+
+### 5.2 Vst Transformation
+
+
+```{r}
+VST <- assay(vst(dds, blind=TRUE))
+boxplot(VST, use.cols = TRUE, col='palegreen')
+```
+
+
+### 5.3 Selecting on coefficient of variation
+
+Creation of "Pathway" column.
+```{r, collapse=TRUE}
+CV <- apply(VST, 1, function(x) sd(x)/abs(mean(x)))
+quantile(CV, probs=seq(0,1,0.1))
+```
+
+```{r, collapse=TRUE}
+CVTh <- 0.35
+```
+
+
+```{r, collapse=TRUE}
+hist(CV, col='palegreen', breaks=30)
+abline(v=quantile(CV, probs=seq(0.5,1,0.1)), col='grey', lwd=1.5)
+abline(v=quantile(CV, probs=CVTh), col='red', lwd=1.5)
+```
+
+
+```{r, collapse=TRUE}
+select <- CV > quantile(CV, CVTh)
+VSTSel <- VST[select, ]
+dim(VSTSel)
+```
+
+### 5.4 Matrix Transposition 
+
+```{r, collapse=TRUE}
+VstSel <- t(VSTSel)
+dim(VstSel)  
+```
+
+### 5.5 SE object for downstream analyses
+
+The SE object is used in downstream analyses for visualization purposed (e.g. module heatmaps).
+
+```{r, collapse=TRUE}
+dds_WGCNA <- dds[select,]
+SE_WGCNA <- as(dds_WGCNA, "RangedSummarizedExperiment")
+assays(SE_WGCNA)$vst <- assay(vst(dds_WGCNA, blind=TRUE))
+```
+
+****
+
+## 6. Data Inspection
+
+### 6.1 Check for missing values
+
+
+```{r, collapse=TRUE}
+gsg = WGCNA::goodSamplesGenes(VstSel, verbose=3)
+gsg$allOK 
+```
+
+### 6.2 Check for outlier samples
+
+```{r, collapse=TRUE}
+sampleTree = hclust(dist(VstSel), method ="average")
+
+par(cex = 0.6)
+par(mar =c(0,4,2,0))
+plot(sampleTree, main ="Sample clustering to detect outliers", sub ="", xlab ="", cex.lab = 1.5, cex.axis=1.5, cex.main =2)
+```
+
+### 6.3 Sample metadata visualization
+
+```{r, fig.height=12}
+sampleTree2 <- hclust(dist(VstSel), method='average')
+traitColors <- numbers2colors(DummyTraits[c(5:20)], signed=TRUE)
+plotDendroAndColors(sampleTree2, traitColors, groupLabels=names(DummyTraits[c(5:20)]), main = 'Sample dendrogram and trait heatmap')
+```
+
+*****
+
+## 7. Network construction
+
+### 7.1 Define soft threshold
+
+```{r}
+powers <- c(c(1:10), seq(from=12, to=20, by=2))
+
+RPowerTable2 <- pickSoftThreshold(VstSel, powerVector=powers, verbose=F, networkType="signed", corFnc='bicor', corOptions=list(maxPOutliers = 0.05)) [[2]]
+```
+
+```{r}
+par(mfrow=c(1,2))
+cex1 = 0.9
+# Scale-free topology fit index as a function of the soft-thresholding power
+plot(RPowerTable2[,1], -sign(RPowerTable2[,3])*RPowerTable2[,2], xlab = 'Soft Threshold (power)', ylab = 'Scale Free Topology Model Fit, signed R^2', type = 'n', main = paste('Scale independence')) 
+text(RPowerTable2[,1], -sign(RPowerTable2[,3])*RPowerTable2[,2], labels=powers, cex = cex1, col='red')
+abline(h=0.8, col='red')  # The line corresponds to using an R^2 cut-off of h
+plot(RPowerTable2[,1], RPowerTable2[,5], xlab = 'Soft Threshold (power)', ylab = 'Mean Connectivity', type = 'n', main = paste('Mean connectivity')) 
+text(RPowerTable2[,1], RPowerTable2[,5], labels=powers, cex = cex1, col='red')
+```
+
+```{r}
+softPowerBi <- 14
+```
+
+
+
+### 7.2 Topological and Overlap matrices
+
+```{r}
+adjacency <- adjacency(VstSel, power=softPowerBi, type="signed", corFnc='bicor', corOptions=list(maxPOutliers = 0.05))
+```
+
+```{r}
+TOM <- TOMsimilarity(adjacency, TOMType= "signed")
+
+dissTOM <- 1-TOM
+```
+
+*****
+
+## 8. Gene Tree and Module identification
+
+### 8.1 Gene Tree
+
+```{r}
+GeneTree <- hclust(as.dist(dissTOM), method = 'average')
+
+plot(GeneTree, xlab='', sub='', main='Gene Clustering on TOM-based dissimilarity', labels=FALSE, hang=0.04)
+```
+
+
+### 8.2 Module identification: tuning parameters
+
+```{r}
+DynamicColorsS1 <- labels2colors(cutreeDynamic(dendro=GeneTree, distM=dissTOM, deepSplit=1, pamRespectsDendro=TRUE, minClusterSize=50, pamStage=TRUE, cutHeight=0.999, maxCoreScatter=0.6, maxPamDist=0.98))
+
+DynamicColorsS2 <- labels2colors(cutreeDynamic(dendro=GeneTree, distM=dissTOM, deepSplit=1, pamRespectsDendro=TRUE, minClusterSize=40, pamStage=TRUE, cutHeight=0.999, maxCoreScatter=0.6, maxPamDist=0.98))
+
+DynamicColorsS3 <- labels2colors(cutreeDynamic(dendro=GeneTree, distM=dissTOM, deepSplit=1, pamRespectsDendro=TRUE, minClusterSize=60, pamStage=TRUE, cutHeight=0.9999, maxCoreScatter=0.6, maxPamDist=0.98))
+
+DynamicColorsS4 <- labels2colors(cutreeDynamic(dendro=GeneTree, distM=dissTOM, deepSplit=2, pamRespectsDendro=TRUE, minClusterSize=60, pamStage=TRUE, cutHeight=0.9999, maxCoreScatter=0.6, maxPamDist=0.98))
+
+
+plotDendroAndColors(GeneTree, cbind(DynamicColorsS1, DynamicColorsS2,DynamicColorsS3, DynamicColorsS4), c('S1','S2', 'S3', 'S4'), dendroLabels = FALSE, hang = 0.03, addGuide = TRUE, guideHang = 0.05, main = 'Gene dendrogram and module colors')
+```
+
+### 8.3 Choose parameters
+
+```{r}
+DynamicModules <- cutreeDynamic(dendro=GeneTree, distM=dissTOM, deepSplit=1, pamRespectsDendro=TRUE, minClusterSize=60, pamStage=TRUE, cutHeight=0.9999, maxCoreScatter=0.6, maxPamDist=0.98)
+
+table(DynamicModules)
+
+DynamicColors <- labels2colors(DynamicModules)
+table(DynamicColors)
+
+plotDendroAndColors(GeneTree, DynamicColors, 'Dynamic Tree Cut', dendroLabels=FALSE, hang=0.03, addGuide=TRUE, guideHang=0.05, main='Gene dendrogram and module colors')
+```
+
+*****
+
+## 9. Module merging
+
+### 9.1 Calculate module eigengenes (ME)
+Define numbers of genes and samples; then calculate Module Eigengenes and order them. A column order is applied, so that modules that are more similar are nearby. 
+
+```{r}
+MEs <- orderMEs(moduleEigengenes(VstSel, DynamicColors)$eigengenes)
+head(MEs)
+```
+
+### 9.2 ME Clustering
+
+```{r}
+METree <- hclust(as.dist(1-cor(MEs)), method = 'average')
+plot(METree, main = 'Clustering of module eigengenes')
+abline(h=0.15, col = 'red')
+```
+
+### 9.3 Merge modules 
+
+```{r}
+MEDissThres <- 0.15
+# Plot the cut line into the dendrogram
+# Call an automatic merging function
+merge <- mergeCloseModules(VstSel, DynamicColors, cutHeight = MEDissThres, verbose = 5, iterate = FALSE)
+# The merged module colors
+FinalColors <- merge$colors
+# Eigengenes of the new merged
+FinalMEs = merge$newMEs
+```
+```{r}
+plotDendroAndColors(GeneTree, cbind(DynamicColors, FinalColors),
+c("Dynamic Tree Cut", "Merged dynamic"),
+dendroLabels = FALSE, hang = 0.03,
+addGuide = TRUE, guideHang = 0.05)
+```
+
+```{r}
+ModuleAssignment <- data.frame(Gene=colnames(VstSel), Module=FinalColors)
+table(ModuleAssignment$Module)
+```
+
+
+****
+
+## 10. Savings
+
+```{r Save}
+save(adjacency, dissTOM, DummyTraits, FinalMEs, VstSel, ModuleAssignment, SE_WGCNA, file=paste0(OutputFolder, 'NetworkGeneration.RData'))
+```
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+save.image(paste0(OutputFolder, '/', 'NetworkGenerationWorkspace.RData'))
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+``` 
+
+
+
+

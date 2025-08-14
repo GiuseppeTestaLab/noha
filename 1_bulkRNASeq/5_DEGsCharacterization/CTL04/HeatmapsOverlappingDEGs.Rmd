@@ -1,0 +1,539 @@
+---
+title: "CTL04: Heatmap overlapping DEGs"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    InputFolder: '~/DataDir/bulkRNASeq/5.DifferentialExpression/CTL04/'
+    SE: '~/DataDir/bulkRNASeq/3.DataExploration/CTL04/Output/FemaleLineSE_Bio.rds'
+    OutputFolder: '~/DataDir/bulkRNASeq/9.DEGsCharacterization/CTL04/HeatmapsOverlappingGenes/'
+---
+
+## Purpose
+
+Heatmaps of DEGs in common among CTL04 samples.
+
+# 1. Environment SetUp  
+ 
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, collapse = TRUE)
+``` 
+  
+ 
+```{r EnvironmentSetupII, collapse=TRUE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+library(SummarizedExperiment)
+library(sechm)
+library(ashr)
+library(sva)
+library(DESeq2)
+
+OutputFolder <- params$OutputFolder
+```
+
+```{r}
+if (dir.exists(OutputFolder) == FALSE) {
+ dir.create(OutputFolder, recursive=FALSE)
+}
+```
+
+
+****
+
+# 2. Data Upload and Preparation
+
+```{r, collapse=TRUE}
+DEA <- readRDS(paste0(params$InputFolder, 'DEARes.rds'))
+```
+
+```{r, collapse=TRUE}
+SE_Bio <- readRDS(params$SE)
+```
+
+```{r}
+colData(SE_Bio)$Condition <- as.factor(colData(SE_Bio)$Condition)
+colData(SE_Bio)$Condition <- factor(colData(SE_Bio)$Condition, levels = c("DMSO", setdiff(levels(colData(SE_Bio)$Condition), "DMSO")))
+```
+
+```{r, collapse=TRUE}
+SE_Bio <- SE_Bio[!duplicated(rowData(SE_Bio)$GeneName), ]
+rownames(SE_Bio) <- rowData(SE_Bio)$GeneName
+
+SE_Bio
+```
+
+
+SE object containing information about `r dim(SE_Bio)[1]` genes in `r dim(SE_Bio)[2]` samples. 
+
+```{r}
+SE_DEA <- SE_Bio
+SE_DEA
+```
+
+__Vst Transformation__
+
+```{r, collapse=TRUE}
+assays(SE_DEA)$vst <- vst(as.matrix(assays(SE_DEA)$counts), blind=TRUE)
+SE_DEA
+```
+
+__Setting Metadata__
+
+```{r, collapse=TRUE}
+metadata(SE_DEA)$anno_colors <- list(
+  Condition = c('DMSO' = 'grey30', 'CTL' = 'azure3', 
+
+                 'AhHyd_Ag'='#F8766D', 'AhHyd_Inh'='#F8766D50',
+
+                 'Andr_Ag'='#fccb17', 'Andr_Inh'='#C49A0050',  
+
+                 "Estr_Ag"= '#53B400', "Estr_Inh"= '#53B40050', 
+
+                 'GC_Ag' = '#00C094', 'GC_Inh' = '#00C09450',
+
+                 'LivX_Ag' = '#00B6EB', 'LivX_Inh' = '#00B6EB50', 
+
+                 'Ret_Ag' = '#A58AFF', 'Ret_Inh' = '#A58AFF50', 
+
+                 'Thyr_Ag' = '#FB61D7', 'Thyr_Inh' = '#FB61D750'
+
+                 ))
+
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+```
+
+
+# 3. Comparison across pathways: Agonist and Inhibitor
+
+## 3.1 Heatmaps for Agonist 
+
+```{r, collapse=TRUE}
+DEGs_Agonist <- list(
+  
+  Thyr_Ag_Up= row.names(DEA$Thyr$Agonist$DEGs[DEA$Thyr$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Thyr_Ag_Down= row.names(DEA$Thyr$Agonist$DEGs[DEA$Thyr$Agonist$DEGs$log2FoldChange < 0, ]),
+  
+  Ret_Ag_Up= row.names(DEA$Ret$Agonist$DEGs[DEA$Ret$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Ret_Ag_Down= row.names(DEA$Ret$Agonist$DEGs[DEA$Ret$Agonist$DEGs$log2FoldChange < 0, ]),
+  
+  Estr_Ag_Up= row.names(DEA$Estr$Agonist$DEGs[DEA$Estr$Agonist$DEGs$log2FoldChange > 0, ]),
+  Estr_Ag_Down= row.names(DEA$Estr$Agonist$DEGs[DEA$Estr$Agonist$DEGs$log2FoldChange < 0, ]),
+  
+  Andr_Ag_Up= row.names(DEA$Andr$Agonist$DEGs[DEA$Andr$Agonist$DEGs$log2FoldChange > 0, ]), 
+  Andr_Ag_Down= row.names(DEA$Andr$Agonist$DEGs[DEA$Andr$Agonist$DEGs$log2FoldChange < 0, ]), 
+  
+  GC_Ag_Up= row.names(DEA$GC$Agonist$DEGs[DEA$GC$Agonist$DEGs$log2FoldChange > 0, ]),
+  GC_Ag_Down= row.names(DEA$GC$Agonist$DEGs[DEA$GC$Agonist$DEGs$log2FoldChange < 0, ]),
+  
+  LivX_Ag_Up= row.names(DEA$LivX$Agonist$DEGs[DEA$LivX$Agonist$DEGs$log2FoldChange > 0, ]), 
+  LivX_Ag_Down= row.names(DEA$LivX$Agonist$DEGs[DEA$LivX$Agonist$DEGs$log2FoldChange < 0, ]), 
+  
+  AhHyd_Ag_Up= row.names(DEA$AhHyd$Agonist$DEGs[DEA$AhHyd$Agonist$DEGs$log2FoldChange > 0, ]), 
+  AhHyd_Ag_Down= row.names(DEA$AhHyd$Agonist$DEGs[DEA$AhHyd$Agonist$DEGs$log2FoldChange < 0, ])
+  
+            )
+```
+
+
+### 3.1.1 Up-regulated genes
+
+#### Heatmap Up-regulated DEGs in common between Retinoic Acid agonist and Thyroid agonist
+
+```{r UpDEGsRetThyrAg,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO", "Ret_Ag", "Thyr_Ag")
+
+DEGs <- intersect(DEGs_Agonist$Ret_Ag_Up, DEGs_Agonist$Thyr_Ag_Up)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+__`r length(DEGs)`__ genes in common.
+
+***
+
+#### Heatmap Up-regulated DEGs in common between Retinoic Acid agonist and Androgen agonist
+
+```{r UpDEGsRetAndrAg, fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO", "Ret_Ag", "Andr_Ag")
+
+DEGs <- intersect(DEGs_Agonist$Ret_Ag_Up, DEGs_Agonist$Andr_Ag_Up)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+__`r length(DEGs)`__ genes in common.
+
+***
+
+#### Heatmap Up-regulated DEGs in common between GC agonist and LivX agonist
+
+No overlap with these conditions
+
+```{r UpDEGsGCLivXAg,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Ag", "GC_Ag")
+
+DEGs <- intersect(DEGs_Agonist$LivX_Ag_Up, DEGs_Agonist$GC_Ag_Up)
+
+# sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+#       gaps_at="Condition",
+#       top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+#       do.scale=TRUE, breaks=0.8)
+```
+__`r length(DEGs)`__ genes in common.
+
+***
+
+
+### 3.1.2 Down-regulated genes
+
+#### Heatmap Down-regulated DEGs in common between Retinoic agonist and Thyroid agonist
+
+```{r DownDEGsThyrRetAg, fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO", "Ret_Ag", "Thyr_Ag")
+
+DEGs <- intersect(DEGs_Agonist$Ret_Ag_Down, DEGs_Agonist$Thyr_Ag_Down)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+__`r length(DEGs)`__ genes in common.
+
+***
+
+#### Heatmap Down-regulated DEGs in common between GC agonist and LivX agonist
+
+
+```{r DownDEGsGCLivXAg,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Ag", "GC_Ag")
+
+DEGs <- intersect(DEGs_Agonist$LivX_Ag_Down, DEGs_Agonist$GC_Ag_Down)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+__`r length(DEGs)`__ genes in common.
+
+***
+
+## 3.2 Heatmaps for Inhibitor
+
+```{r, collapse=TRUE}
+DEGs_Inh <- list(
+  
+  Thyr_Inh_Up= row.names(DEA$Thyr$Inhibitor$DEGs[DEA$Thyr$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  Thyr_Inh_Down= row.names(DEA$Thyr$Inhibitor$DEGs[DEA$Thyr$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  Ret_Inh_Up= row.names(DEA$Ret$Inhibitor$DEGs[DEA$Ret$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  Ret_Inh_Down= row.names(DEA$Ret$Inhibitor$DEGs[DEA$Ret$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  Estr_Inh_Up= row.names(DEA$Estr$Inhibitor$DEGs[DEA$Estr$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  Estr_Inh_Down= row.names(DEA$Estr$Inhibitor$DEGs[DEA$Estr$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  Andr_Inh_Up= row.names(DEA$Andr$Inhibitor$DEGs[DEA$Andr$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  Andr_Inh_Down= row.names(DEA$Andr$Inhibitor$DEGs[DEA$Andr$Inhibitor$DEGs$log2FoldChange < 0, ]), 
+  
+  GC_Inh_Up= row.names(DEA$GC$Inhibitor$DEGs[DEA$GC$Inhibitor$DEGs$log2FoldChange > 0, ]),
+  GC_Inh_Down= row.names(DEA$GC$Inhibitor$DEGs[DEA$GC$Inhibitor$DEGs$log2FoldChange < 0, ]),
+  
+  LivX_Inh_Up= row.names(DEA$LivX$Inhibitor$DEGs[DEA$LivX$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  LivX_Inh_Down= row.names(DEA$LivX$Inhibitor$DEGs[DEA$LivX$Inhibitor$DEGs$log2FoldChange < 0, ]), 
+  
+  AhHyd_Inh_Up= row.names(DEA$AhHyd$Inhibitor$DEGs[DEA$AhHyd$Inhibitor$DEGs$log2FoldChange > 0, ]), 
+  AhHyd_Inh_Down= row.names(DEA$AhHyd$Inhibitor$DEGs[DEA$AhHyd$Inhibitor$DEGs$log2FoldChange < 0, ])
+  
+            )
+```
+
+
+### 3.2.1 Up-regulated genes
+
+
+#### Heatmap Up-regulated DEGs in common between LiverX inhibitor and GC inhibitor
+
+```{r UpDEGsLivXGCInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Inh", "GC_Inh", "Thyr_Inh")
+
+DEGs <- intersect(DEGs_Inh$LivX_Inh_Up, DEGs_Inh$GC_Inh_Up)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+__`r length(DEGs)`__ genes in common.
+
+#### Heatmap Up-regulated DEGs in common between Thyroid inhibitor and LiverX inhibitor
+
+```{r UpDEGsThyrLivXInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Inh", "GC_Inh", "Thyr_Inh")
+
+DEGs <- intersect(DEGs_Inh$Thyr_Inh_Up, DEGs_Inh$LivX_Inh_Up)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Up-regulated DEGs in common between GC inhibitor and Thyroid inhibitor
+
+```{r UpDEGsGCThyrInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Inh", "GC_Inh", "Thyr_Inh")
+
+DEGs <- intersect(DEGs_Inh$GC_Inh_Up, DEGs_Inh$Thyr_Inh_Up)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Up-regulated DEGs in common between LiverX inhibitor, Thyroid inhibitor and GC inhibitor
+
+```{r UpDEGsGCThyrLivXInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Inh", "GC_Inh", "Thyr_Inh")
+
+DEGs <- Reduce(intersect, list(DEGs_Inh$GC_Inh_Up, DEGs_Inh$Thyr_Inh_Up, DEGs_Inh$LivX_Inh_Up))
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+
+### 3.2.2 Down-regulated genes
+
+
+#### Heatmap Down-regulated DEGs in common between LiverX inhibitor and GC inhibitor
+
+```{r DownDEGsLivXGCInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Inh", "GC_Inh", "Thyr_Inh")
+
+DEGs <- intersect(DEGs_Inh$LivX_Inh_Down, DEGs_Inh$GC_Inh_Down)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+__`r length(DEGs)`__ genes in common.
+
+#### Heatmap Down-regulated DEGs in common between Thyroid inhibitor and LiverX inhibitor
+
+```{r DownDEGsThyrLivXInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Inh", "GC_Inh", "Thyr_Inh")
+
+DEGs <- intersect(DEGs_Inh$Thyr_Inh_Down, DEGs_Inh$LivX_Inh_Down)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Down-regulated DEGs in common between GC inhibitor and Thyroid inhibitor
+
+```{r DownDEGsGCThyrInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Inh", "GC_Inh", "Thyr_Inh")
+
+DEGs <- intersect(DEGs_Inh$GC_Inh_Down, DEGs_Inh$Thyr_Inh_Down)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Down-regulated DEGs in common between LiverX inhibitor, Thyroid inhibitor and GC inhibitor
+
+```{r DownDEGsGCThyrLivXInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("DMSO","LivX_Inh", "GC_Inh", "Thyr_Inh")
+
+DEGs <- Reduce(intersect, list(DEGs_Inh$GC_Inh_Down, DEGs_Inh$Thyr_Inh_Down, DEGs_Inh$LivX_Inh_Down))
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+## 3.3 Heatmaps for AgvsInh
+
+```{r, collapse=TRUE}
+DEGs_AgvsInh <- list(
+  
+  Thyr_AgvsInh_Up= row.names(DEA$Thyr$AgvsInh$DEGs[DEA$Thyr$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  Thyr_AgvsInh_Down= row.names(DEA$Thyr$AgvsInh$DEGs[DEA$Thyr$AgvsInh$DEGs$log2FoldChange < 0, ]),
+  
+  Ret_AgvsInh_Up= row.names(DEA$Ret$AgvsInh$DEGs[DEA$Ret$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  Ret_AgvsInh_Down= row.names(DEA$Ret$AgvsInh$DEGs[DEA$Ret$AgvsInh$DEGs$log2FoldChange < 0, ]),
+  
+  Estr_AgvsInh_Up= row.names(DEA$Estr$AgvsInh$DEGs[DEA$Estr$AgvsInh$DEGs$log2FoldChange > 0, ]),
+  Estr_AgvsInh_Down= row.names(DEA$Estr$AgvsInh$DEGs[DEA$Estr$AgvsInh$DEGs$log2FoldChange < 0, ]),
+  
+  Andr_AgvsInh_Up= row.names(DEA$Andr$AgvsInh$DEGs[DEA$Andr$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  Andr_AgvsInh_Down= row.names(DEA$Andr$AgvsInh$DEGs[DEA$Andr$AgvsInh$DEGs$log2FoldChange < 0, ]), 
+  
+  GC_AgvsInh_Up= row.names(DEA$GC$AgvsInh$DEGs[DEA$GC$AgvsInh$DEGs$log2FoldChange > 0, ]),
+  GC_AgvsInh_Down= row.names(DEA$GC$AgvsInh$DEGs[DEA$GC$AgvsInh$DEGs$log2FoldChange < 0, ]),
+  
+  LivX_AgvsInh_Up= row.names(DEA$LivX$AgvsInh$DEGs[DEA$LivX$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  LivX_AgvsInh_Down= row.names(DEA$LivX$AgvsInh$DEGs[DEA$LivX$AgvsInh$DEGs$log2FoldChange < 0, ]), 
+  
+  AhHyd_AgvsInh_Up= row.names(DEA$AhHyd$AgvsInh$DEGs[DEA$AhHyd$AgvsInh$DEGs$log2FoldChange > 0, ]), 
+  AhHyd_AgvsInh_Down= row.names(DEA$AhHyd$AgvsInh$DEGs[DEA$AhHyd$AgvsInh$DEGs$log2FoldChange < 0, ])
+  
+            )
+```
+
+### 3.3.1 Up-regulated genes
+
+#### Heatmap Up-regulated DEGs in common between LiverX AgvsInh and GC AgvsInh
+
+```{r UpDEGsGCLiverXAgvsInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("LivX_Inh", "GC_Inh", "LivX_Ag", "GC_Ag")
+
+DEGs <- intersect(DEGs_AgvsInh$GC_AgvsInh_Up, DEGs_AgvsInh$LivX_AgvsInh_Up)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Up-regulated DEGs in common between LiverX AgvsInh and Thyr AgvsInh
+
+```{r UpDEGsThyrLiverXAgvsInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("LivX_Inh", "Thyr_Inh", "LivX_Ag", "Thyr_Ag")
+
+DEGs <- intersect(DEGs_AgvsInh$Thyr_AgvsInh_Up, DEGs_AgvsInh$LivX_AgvsInh_Up)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Up-regulated DEGs in common between GC AgvsInh and Thyr AgvsInh
+
+```{r UpDEGsGCThyrAgvsInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("GC_Inh", "Thyr_Inh", "GC_Ag", "Thyr_Ag")
+
+DEGs <- intersect(DEGs_AgvsInh$Thyr_AgvsInh_Up, DEGs_AgvsInh$GC_AgvsInh_Up)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Up-regulated DEGs in common between GC AgvsInh, Thyr AgvsInh and LivX AgvsInh
+
+```{r UpDEGsGCLivXThyrAgvsInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("Thyr_Inh", "LivX_Inh", "Thyr_Ag", "LivX_Ag", "GC_Ag", "GC_Inh")
+
+DEGs <- Reduce(intersect, list(DEGs_AgvsInh$LivX_AgvsInh_Up, DEGs_AgvsInh$Thyr_AgvsInh_Up, DEGs_AgvsInh$GC_AgvsInh_Up))
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors, show_rownames = T,
+      do.scale=TRUE, breaks=0.8)
+```
+***
+
+### 3.3.2 Down-regulated genes
+
+#### Heatmap Down-regulated DEGs in common between LiverX AgvsInh and GC AgvsInh
+
+```{r DownDEGsGCLiverXAgvsInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("LivX_Inh", "GC_Inh", "LivX_Ag", "GC_Ag")
+
+DEGs <- intersect(DEGs_AgvsInh$GC_AgvsInh_Down, DEGs_AgvsInh$LivX_AgvsInh_Down)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Down-regulated DEGs in common between Thyr AgvsInh and GC AgvsInh
+
+```{r DownDEGsGCThyrAgvsInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("Thyr_Inh", "GC_Inh", "Thyr_Ag", "GC_Ag")
+
+DEGs <- intersect(DEGs_AgvsInh$GC_AgvsInh_Down, DEGs_AgvsInh$Thyr_AgvsInh_Down)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Down-regulated DEGs in common between Thyr AgvsInh and LivX AgvsInh
+
+```{r DownDEGsLivXThyrAgvsInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("Thyr_Inh", "LivX_Inh", "Thyr_Ag", "LivX_Ag")
+
+DEGs <- intersect(DEGs_AgvsInh$LivX_AgvsInh_Down, DEGs_AgvsInh$Thyr_AgvsInh_Down)
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors,
+      do.scale=TRUE, breaks=0.8)
+```
+
+#### Heatmap Down-regulated DEGs in common between Thyr AgvsInh, LivX AgvsInh and GC AgvsInh
+
+```{r DownDEGsGCLivXThyrAgvsInh,fig.width=16, fig.height=12, collapse=TRUE}
+S <- colData(SE_DEA)[, "Condition"] %in% c("Thyr_Inh", "LivX_Inh", "Thyr_Ag", "LivX_Ag", "GC_Ag", "GC_Inh")
+
+DEGs <- Reduce(intersect, list(DEGs_AgvsInh$LivX_AgvsInh_Down, DEGs_AgvsInh$Thyr_AgvsInh_Down, DEGs_AgvsInh$GC_AgvsInh_Down))
+
+sechm(SE_DEA[,S], features=DEGs, assayName="vst",
+      gaps_at="Condition",
+      top_annotation=c('Condition'), hmcols=ScaledCols, anno_colors = metadata(SE_DEA)$anno_colors, show_rownames = T,
+      do.scale=TRUE, breaks=0.8)
+```
+
+## 4. Session info
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+``` 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

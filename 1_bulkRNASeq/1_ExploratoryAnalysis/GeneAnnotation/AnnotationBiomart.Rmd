@@ -1,0 +1,161 @@
+---
+title: "Annotation from Biomart"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'tango'
+        code_folding: hide
+params: 
+    Specie: 'hsapiens'
+    Host: 'aug2020.archive.ensembl.org'
+    GeneCounts: '~/DataDir/bulkRNASeq/3.DataExploration/CTL08/CompleteMatrices/EndPoints_SeqRun_2021.03_07_2022.04_Counts.txt'
+    EnsemblGeneVector: NULL
+    OutputFolder: '~/DataDir/bulkRNASeq/3.DataExploration/GeneAnnotation/'
+---
+
+### 1. Environment Set Up
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(biomaRt)
+library(tidyr)
+library(dplyr)
+```
+
+
+```{r FolderSetting}
+OutputFolder <- params$OutputFolder
+if (dir.exists(OutputFolder) == FALSE) {
+  dir.create(OutputFolder, recursive=FALSE)
+}
+```
+
+****
+
+### 2. DATA UPLOAD
+
+```{r Data}
+GeneCounts <- params$GeneCounts
+
+if(is.null(GeneCounts)==FALSE){
+  GC <- read.table(GeneCounts, header=TRUE) %>% dplyr::filter(!duplicated(Gene)) %>% dplyr::mutate(EnsGene=Gene) %>%
+    tidyr::separate(EnsGene, into=c('EnsGene', 'Discard')) %>% dplyr::select(Gene, EnsGene)
+  GeneVector <- as.vector(GC$EnsGene) %>% unique()
+  #length(GeneVector)
+} else {
+    GeneVector <- read.delim(params$EnsemblGeneVector)
+  }
+
+if(! identical(length(GeneVector), length(GC$Gene))){
+  'The generated gene vector has a different number of genes than the gene count table.'
+}
+```
+
+__Gene Vector contains `r length(GeneVector)` gene codes: `r paste(paste(GeneVector[1:3], collapse=' '), '...')`__   
+
+
+****
+
+### 3. ACCESS TO BIOMART 
+
+```{r Access, collapse=TRUE}
+Host <- params$Host
+Specie <- params$Specie
+BioMart <- biomaRt::listMarts(host=Host)[1,1]
+Version <- biomaRt::listMarts(host=Host)[1,2]
+Mart <- biomaRt::useMart(host=Host, biomart=BioMart, version=Version, 
+                dataset=paste0(Specie,'_gene_ensembl'))
+Mart
+```
+
+__From host `r Host`, `r Version` version of `r BioMart` biomart is interrogated.__  
+
+
+****
+
+### 4. ANNOTATION RETRIEVAL 
+
+```{r AttributeSetting, collapse=TRUE}
+if(Specie=='hsapiens'){
+  Attributes = c('ensembl_gene_id', 'hgnc_symbol', 'external_gene_name', 'gene_biotype',
+                 'description', 'chromosome_name', 'start_position', 'end_position')
+  
+  } else if(Specie=='mmusculus'){
+  Attributes = c('ensembl_gene_id', 'mgi_symbol', 'external_gene_name', 'gene_biotype', 
+                 'description', 'chromosome_name', 'start_position', 'end_position')
+  
+  } else if(Specie=='rnorvegicus'){
+  Attributes = c('ensembl_gene_id', 'rgd_symbo', 'external_gene_name', 'gene_biotype', 
+                 'description', 'chromosome_name', 'start_position', 'end_position')
+  
+  } else {
+  message('Sorry, specie currently not supported!')
+}
+```
+
+
+```{r Annotation, collapse=TRUE}
+Annotation <- biomaRt::getBM(mart=Mart, values=GeneVector, filters='ensembl_gene_id', attributes=Attributes, 
+                    uniqueRows=TRUE)
+Annotation <- Annotation %>% dplyr::filter(!duplicated(ensembl_gene_id))
+dim(Annotation)  
+if(length(unique(Annotation$ensembl_gene_id)) != length(Annotation$ensembl_gene_id)){
+  stop('ERROR: not-unique EnsemblID in annotation!')
+} 
+if(dim(Annotation)[1] != length(GeneVector)){
+  message('WARNING: inconsistency between length of gene vector and annotation!')
+} 
+```
+
+
+### 5. MERGE WITH GENE COUNTS. 
+
+```{r Merge, collapse=TRUE}
+if(is.null(GeneCounts)==FALSE){
+  AnnotationDF <- dplyr::left_join(GC, Annotation, by=c('EnsGene' = 'ensembl_gene_id')) 
+  }else{
+  AnnotationDF <- data.frame(Annotation)
+}  
+
+AnnotationDF <- AnnotationDF %>% dplyr::arrange(Gene)
+dim(AnnotationDF)
+if(length(unique(AnnotationDF$EnsGene)) != length(AnnotationDF$EnsGene)){
+  message('WARNING: non-unique EnsemblID in final annotation dataframe!')
+} 
+
+if(dim(AnnotationDF)[1] != length(GeneVector)){
+  stop('ERROR: inconsistency between length of gene vector and final annotation dataframe!')
+}
+```
+
+****
+
+### 6. Savings
+
+```{r SaveTable}
+write.table(AnnotationDF, paste0(OutputFolder, 'AnnotationEns101.txt'), quote=TRUE, row.names=FALSE, sep='\t')
+```
+
+
+```{r SaveRds}
+OutputAnnotation <- list()
+OutputAnnotation$AnnotationDF <- AnnotationDF
+OutputAnnotation$AnalysisParameters <- params
+OutputAnnotation$Date <- date()
+OutputAnnotation$Session <- sessionInfo()
+saveRDS(OutputAnnotation, paste0(OutputFolder, 'OutputAnnotation.rds')) 
+```
+
+```{r}
+date()
+sessionInfo()
+```
+
+ 
