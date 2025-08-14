@@ -43,7 +43,7 @@ generate_EnrichmentBrowser_html <- function(Folder_EnrichBrow_markdown, Folder_E
         OutputFolder = paste0(Folder_EnrichBrow_Output, Condition1, "/", Condition2, "/"), 
         Condition_1 = Condition1,
         Condition_2 = Condition2),
-        output_file=paste0("EnrichmentBrowser_", Condition1, "_", Condition2))
+        output_file=paste0("EnrichmentBrowser_", Condition1, "_", Condition2, "_CTL04"))
   )
 }
 ```

@@ -46,7 +46,7 @@ generate_EnrichmentBrowser_html <- function(Folder_EnrichBrow_markdown, Folder_E
         Condition_2 = Condition2,
         camera = cameraBoolean,
         padog = padogBoolean), 
-        output_file=paste0("EnrichmentBrowser_", Condition1, "_", Condition2))
+        output_file=paste0("EnrichmentBrowser_", Condition1, "_", Condition2, "_CTL08"))
   )
 }
 ```
