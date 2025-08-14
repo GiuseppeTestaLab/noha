@@ -1,0 +1,264 @@
+---
+title: "Steroidomics: relationship between steroid concentrations and WGCNA gene modules"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    InputFolder: '~/DataDir/steroidomics/'
+---
+
+Here we want to examine the relationship between the WGCNA modules and the levels of compounds measured by steroidomics. We work on mean values registered for the replicates of each exposure condition. 
+For steroidomics, we select the values measured in CTL04, since the WGCNA has been performed on this line. 
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE, collapse = TRUE)
+```
+
+## 1. Environment Set Up
+
+### 1.1 Values of RMarkdown parameters
+
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(dplyr)
+library(ggplot2)
+library(ggrepel)
+library(viridis)
+```
+
+```{r FolderSetting}
+InputFolder <- params$InputFolder
+```
+
+
+------------------------------------------------------------------------
+
+## 2. Data Upload
+
+### 2.1 Objects from WGCNA first step
+
+We need FinalMEs to retrieve the module eigengene associated to each sample and the metadata present in DummyTraits.
+
+```{r collapse=TRUE}
+load('~/DataDir/bulkRNASeq/8.WGCNA/CTL04/1_NetworkGeneration/NetworkGeneration.RData')
+rm(adjacency, dissTOM, SE_WGCNA, VstSel)
+```
+
+
+### 2.2 Steroidomics data
+
+```{r collapse=TRUE}
+Steroidomics <- openxlsx::read.xlsx("./Normalized_Counts_Neuralorganoids_Steroidomics.xlsx")
+head(Steroidomics)
+```
+
+
+------------------------------------------------------------------------
+
+
+
+## 3. Organize module eigengene data
+
+Calculate the mean value for each module eigengene in each exposure condition. 
+
+
+```{r}
+ModuleEig <- data.frame(merge(FinalMEs, DummyTraits[, 1:3], by='row.names'))
+
+MeanEig <-  dplyr::group_by(ModuleEig, Condition) %>% 
+  summarize(Greenyellow = mean(MEgreenyellow, na.rm=TRUE), 
+            Grey60 = mean(MEgrey60, na.rm=TRUE),
+            Turquoise = mean(MEturquoise, na.rm=TRUE), 
+            Brown = mean(MEbrown, na.rm=TRUE), 
+            Tan = mean(MEtan, na.rm=TRUE), 
+            Black = mean(MEblack, na.rm=TRUE), 
+            Green = mean(MEgreen, na.rm=TRUE), 
+            Magenta = mean(MEmagenta, na.rm=TRUE), 
+            Blue = mean(MEblue, na.rm=TRUE), 
+            Pink = mean(MEpink, na.rm=TRUE), 
+            Red = mean(MEred, na.rm=TRUE), 
+            DarkRed = mean(MEdarkred, na.rm=TRUE), 
+            Midnightblue = mean(MEmidnightblue, na.rm=TRUE), 
+            Lightgreen = mean(MElightgreen, na.rm=TRUE), 
+            Lightyellow = mean(MElightyellow, na.rm=TRUE), 
+            Cyan = mean(MEcyan, na.rm=TRUE), 
+            Purple = mean(MEpurple, na.rm=TRUE), 
+            Royalblue = mean(MEroyalblue, na.rm=TRUE))
+```
+
+
+## 4. Organize steroidomics data
+
+* Select CTL04.
+* Select compounds with quantification higher than 0 in at least 8 samples.
+* Calculate the mean value of each compound in each exposure condition.
+* Recode the exposure nomenclature to be coherent with WGCNA.
+
+
+```{r, collapse=TRUE}
+lapply(Steroidomics[Steroidomics$Line=='CTL04E', 6:20], function(x) sum(x>0))
+```
+
+The compounds that are quantified in at least 1/6 (8) samples are: pregnenolone, testosterone, androstenedione, corticosterone, cortisol, progesterone, E1, 17bE2. 
+
+```{r}
+MeanSteroid <-  dplyr::group_by(Steroidomics[Steroidomics$Line=='CTL04E', ], Condition) %>% 
+  summarize(Pregnenolone = mean(pregnenolone, na.rm=TRUE), 
+            Testosterone = mean(testosterone, na.rm=TRUE), 
+            Androstenedione = mean(androstenedione, na.rm=TRUE), 
+            Corticosterone = mean(corticosterone, na.rm=TRUE), 
+            Cortisol = mean(cortisol, na.rm=TRUE), 
+            Progesterone = mean(progesterone, na.rm=TRUE),
+            E1 = mean(E1, na.rm=TRUE), 
+            `17bE2` = mean(`17bE2`, na.rm=TRUE))
+```
+
+
+```{r}
+MeanSteroid <- MeanSteroid %>% mutate(Condition=replace(Condition, Condition=='AHR AG', "AhHyd_Ag")) %>%
+  mutate(Condition=replace(Condition, Condition=='AHR ANT', "AhHyd_Inh")) %>%
+  mutate(Condition=replace(Condition, Condition=='AND AG', "Andr_Ag")) %>%
+  mutate(Condition=replace(Condition, Condition=='AND ANT', "Andr_Inh")) %>%
+  #mutate(Condition=replace(Condition, Condition=='CTL', "CTL")) %>%
+  #mutate(Condition=replace(Condition, Condition=='DMSO', "DMSO")) %>%
+  mutate(Condition=replace(Condition, Condition=='EST AG', "Estr_Ag")) %>%
+  mutate(Condition=replace(Condition, Condition=='EST ANT', "Estr_Inh")) %>%
+  mutate(Condition=replace(Condition, Condition=='GC AG', "CG_Ag")) %>%
+  mutate(Condition=replace(Condition, Condition=='GC ANT', "GC_Inh")) %>%
+  mutate(Condition=replace(Condition, Condition=='LX AG', "LivX_Ag")) %>%
+  mutate(Condition=replace(Condition, Condition=='LX ANT', "LivX_Inh")) %>%
+  mutate(Condition=replace(Condition, Condition=='RET AG', "Ret_Ag")) %>%
+  mutate(Condition=replace(Condition, Condition=='RET ANT', "Ret_Inh")) %>%
+  mutate(Condition=replace(Condition, Condition=='TH AG', "Thyr_Ag")) %>%
+  mutate(Condition=replace(Condition, Condition=='TH ANT', "Thyr_Inh"))
+```
+
+
+
+## 5. Module-compound correlation 
+
+### 5.1 Calculate Spearman correlation
+
+```{r collapse=TRUE}
+MeanEigCorr <- data.frame(MeanEig[,-1])
+row.names(MeanEigCorr) <- as.vector(as.matrix(MeanEig[,1]))
+
+MeanSteroidCorr <- data.frame(MeanSteroid[,-1])
+row.names(MeanSteroidCorr) <- as.vector(as.matrix(MeanSteroid[,1]))
+```
+
+```{r collapse=TRUE}
+nSteroids <- ncol(MeanSteroidCorr) 
+nSamples <- nrow(MeanSteroidCorr)
+
+# spearman correlation
+SpearmanCor <- WGCNA::cor(MeanEigCorr, MeanSteroidCorr, use = 'p', method='spearman')
+SpearmanPvalue <- WGCNA::corPvalueStudent(SpearmanCor, nSamples)
+```
+
+### 5.2 Visualize correlation matrix
+
+```{r fig.width=14, fig.height=7, fig.align='center'}
+textMatrix <- paste(signif(SpearmanCor,2), '\n(', signif(SpearmanPvalue, 1), ')', sep = '')
+dim(textMatrix) <- dim(SpearmanCor)
+WGCNA::labeledHeatmap(Matrix = SpearmanCor, xLabels=names(MeanSteroidCorr), yLabels=names(MeanEigCorr), ySymbols=names(MeanEigCorr), 
+                      colorLabels=FALSE, colors=viridis(50)[15:50], textMatrix = textMatrix, setStdMargins = FALSE, 
+                      cex.text = 0.5, zlim = c(-1,1), main = paste('Module-trait relationships'))
+```
+
+
+# 6. Scatterplots {.tabset}
+
+Represented by scatterplots the correlations for the modules and steroids with a correlation coefficient >= 0.6 and a pvalue <=0.01
+
+```{r}
+Merged <- inner_join(MeanEig, MeanSteroid, by='Condition')
+```
+
+```{r}
+scatterPlot <- function(myData, compound, module){
+  
+  ggplot(data=myData, aes(x=log2(!!sym(compound)+0.01), y=(!!sym(module)), col=Condition)) +
+  geom_point(size=2) +
+    geom_label_repel(label=myData$Condition) +
+    theme_minimal() +
+    theme(legend.position="none")
+  }
+```
+
+
+## Pregnenolone
+
+
+```{r}
+scatterPlot(Merged, compound='Pregnenolone', module='Magenta')
+```
+
+```{r}
+scatterPlot(Merged, compound='Pregnenolone', module='Turquoise')
+```
+
+
+## Testosterone
+
+### Grey60
+
+```{r}
+scatterPlot(Merged, compound='Testosterone', module='Grey60')
+```
+
+### Tan
+
+```{r}
+scatterPlot(Merged, compound='Testosterone', module='Tan')
+```
+### Lightgreen
+
+```{r}
+scatterPlot(Merged, compound='Testosterone', module='Lightgreen')
+```
+
+## Androstenedione
+
+### Tan
+
+```{r}
+scatterPlot(Merged, compound='Androstenedione', module='Tan')
+```
+
+### Lightgreen
+
+```{r}
+scatterPlot(Merged, compound='Androstenedione', module='Lightgreen')
+```
+
+## E1
+
+### Magenta
+
+```{r}
+scatterPlot(Merged, compound='E1', module='Magenta')
+```
+
+------------------------------------------------------------------------
+
+# 7. SessionInfo
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+```

@@ -1,0 +1,660 @@
+---
+title: "Steroidomics: visualization of normalized concentrations"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    InputFolder: '~/DataDir/steroidomics/'
+---
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
+
+## 1. Environment Set Up
+
+### 1.1 Values of RMarkdown parameters
+
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(dplyr)
+library(ggplot2)
+library(DT)
+library(viridis)
+```
+
+```{r FolderSetting}
+InputFolder <- params$InputFolder
+```
+
+
+------------------------------------------------------------------------
+
+## 2. Data Upload
+
+
+```{r collapse=TRUE}
+Steroidomics <- openxlsx::read.xlsx("./Normalized_Counts_Neuralorganoids_Steroidomics.xlsx")
+head(Steroidomics)
+```
+
+```{r}
+colnames(Steroidomics)
+```
+Measured compounds
+
+ * dht
+ * pregnenolone
+ * testosterone
+ * androstenedione
+ * corticosterone
+ * cortisol
+ * progesterone
+ * corticone
+ * DHEA
+ * Androsterone
+ * Androstanedione
+ * E1
+ * 17bE2
+ * E3
+ * 17aB2
+
+
+```{r}
+densPlot <- function(myData, compound){
+  
+  ggplot(data=myData, aes(x=(!!sym(compound)), group=Line, fill=Line)) +
+  geom_density(adjust=1.5, alpha=.4) +
+  scale_fill_viridis(discrete=TRUE) +
+    theme_minimal() +
+    theme(axis.title.y=element_blank())
+
+  }
+
+
+
+boxPlot <- function(myData, compound){
+  
+  ggplot(data=myData, aes(x=(!!sym(compound)), y=Condition, fill=Line)) +
+  geom_boxplot(alpha=0.5, size=0.5) +
+  scale_fill_viridis(discrete=TRUE) +
+    theme_minimal() +
+  theme(axis.title.y=element_blank())
+  }
+
+
+
+logPlot <- function(myData, compound){
+  
+  ggplot(data=myData, aes(y=log2(!!sym(compound)+0.01), x=Condition, fill=Line)) +
+  geom_boxplot(alpha=0.5) +
+  scale_fill_viridis(discrete=TRUE) +
+    theme_minimal() +
+    theme(axis.text.x=element_text(angle = 90), axis.title.x=element_blank(), 
+          legend.position="bottom")
+  }
+
+```
+
+
+
+## 3. DHT {.tabset}
+
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$dht, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$dht != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$dht!=0, ]$dht)
+```
+
+```{r, collapse=TRUE}
+compound = 'dht'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 4. Pregnenolone {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$pregnenolone, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$pregnenolone != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$pregnenolone!=0, ]$pregnenolone)
+```
+
+```{r, collapse=TRUE}
+compound = 'pregnenolone'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 5. Testosterone {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$testosterone, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$testosterone != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$testosterone!=0, ]$testosterone)
+```
+
+```{r, collapse=TRUE}
+compound = 'testosterone'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 6. Androstenedione {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$androstenedione, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$androstenedione != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$androstenedione!=0, ]$androstenedione)
+```
+
+```{r, collapse=TRUE}
+compound = 'androstenedione'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+
+## 7. Corticosterone {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$corticosterone, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$corticosterone != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$corticosterone!=0, ]$corticosterone)
+```
+
+```{r, collapse=TRUE}
+compound = 'corticosterone'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 8. Cortisol {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$cortisol, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$cortisol != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$cortisol!=0, ]$cortisol)
+```
+
+```{r, collapse=TRUE}
+compound = 'cortisol'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+
+## 9. Progesterone {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$progesterone, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$progesterone != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$progesterone!=0, ]$progesterone)
+```
+
+```{r, collapse=TRUE}
+compound = 'progesterone'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 10. Cortisone {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$cortisone, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$cortisone != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$cortisone!=0, ]$cortisone)
+```
+
+```{r, collapse=TRUE}
+compound = 'cortisone'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 11. DHEA {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$DHEA, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$DHEA != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$DHEA!=0, ]$DHEA)
+```
+
+```{r, collapse=TRUE}
+compound = 'DHEA'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 12. Androsterone {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$Androsterone, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$Androsterone != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$Androsterone!=0, ]$Androsterone)
+```
+
+```{r, collapse=TRUE}
+compound = 'Androsterone'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 13. Androstanedione {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$Androstanedione, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$Androstanedione != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$Androstanedione!=0, ]$Androstanedione)
+```
+
+```{r, collapse=TRUE}
+compound = 'Androstanedione'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 14. E1 {.tabset}
+
+### Distribution
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$E1, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$E1 != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$E1!=0, ]$Androstanedione)
+```
+
+```{r, collapse=TRUE}
+compound = 'E1'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 15. E3 {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$E3, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$E3 != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$E3!=0, ]$Androstanedione)
+```
+
+```{r, collapse=TRUE}
+compound = 'E3'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 16. 17aE2 {.tabset}
+
+### Distribution
+
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$`17aE2`, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$`17aE2` != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$`17aE2`!=0, ]$`17aE2`)
+```
+
+```{r, collapse=TRUE}
+compound = '17aE2'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+
+## 17. 17bE2 {.tabset}
+
+### Distribution
+
+```{r, collapse = TRUE}
+quantile(Steroidomics$`17bE2`, probs=(seq(0,1,by=0.1)))
+```
+
+```{r, collapse=TRUE}
+sum(Steroidomics$`17bE2` != 0)
+```
+
+```{r, collapse=TRUE}
+min(Steroidomics[Steroidomics$`17bE2`!=0, ]$`17bE2`)
+```
+
+```{r, collapse=TRUE}
+compound = '17bE2'
+densPlot(Steroidomics, compound)
+```
+
+
+### Boxplot
+
+```{r}
+boxPlot(Steroidomics, compound)
+```
+
+### Log Boxplot
+
+```{r}
+logPlot(Steroidomics, compound)
+```
+
+## 18. SessionInfo
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+```
