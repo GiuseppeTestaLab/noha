@@ -40,37 +40,51 @@ jobs:
       # nbconvert to create html from the ipynb files
       - name: run nbconvert
         run: |
-          for nb in $(ls *.ipynb)
-             do jupyter nbconvert --to html $nb
-          done
           mkdir notebooks-html/
-          if ls *.html >/dev/null 2>&1; then
-             mv *.html notebooks-html/
-          fi
-          
-          for dir in */; do
-            # Check if it's a directory (excluding symbolic links)
-            if [ -d "$dir" ] && ! [ -L "$dir" ]; then
-              if ls "$dir"/*.ipynb >/dev/null 2>&1; then
-                for nb in $(ls $dir/*.ipynb)
-                  do jupyter nbconvert --to html $nb
-                done
-                mkdir notebooks-html/$dir/
-                mv $dir/*.html notebooks-html/$dir/
-              fi
-            fi
+
+          for nb in $(find 2_scRNASeq 3_ImageAnalysis -type f -name "*.ipynb"); do
+              echo "Converting: $nb"
+              jupyter nbconvert --to html "$nb" 
+              mv $(dirname "$nb")/$(basename "$nb" .ipynb).html notebooks-html/
           done
 
+      #- name: move R html - bulk + steroidomics
+      - name: move R html
+        run: |
+          for file in $(find 1_bulkRNASeq 2_scRNASeq 4_steroidomics -type f -name "*.html"); do
+                mv $file notebooks-html/
+          done 
+          
       # create the index page for gh-pages
       - name: create index
         run: python resources/create_notebooks_index.py resources/config.yaml  > notebooks-html/index.html 
 
       # deploy the html pages to the gh-pages branch
-      - name: deploy
-        uses: s0/git-publish-subdir-action@develop
-        env:
-          REPO: self
-          BRANCH: gh-pages
-          FOLDER: notebooks-html
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          name: github-pages
+          path: notebooks-html
 
+  # Deploy job
+  deploy:
+    # Add a dependency to the build job
+    needs: build
+
+    # Grant GITHUB_TOKEN the permissions required to make a Pages deployment
+    permissions:
+      pages: write      # to deploy to Pages
+      id-token: write   # to verify the deployment originates from an appropriate source
+
+    # Deploy to the github-pages environment
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    # Specify runner + deployment step
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+        

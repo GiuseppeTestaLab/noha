@@ -1,36 +1,236 @@
+title: "Neural Organoid Hormonal Atlas (NOHA)"
 
-title: "Project Name - Long version"
-short_title: "Project"
+short_title: "A molecular cell atlas of endocrine signalling in human neural organoids"
+
 subtitle: |
-   Template github repository that can be used e.g. for the publication of the code when submitting a paper. 
-   
-   GH Actions are set to:
-   
-   1. convert the ipynb to html, create an index html page and store all the pages in a separate branch, where they can be published as static website with github pages
-   2. create a README index file for the repo that contains all the links to the html and ipynb files.
-   
-   Feel free to fork it for "publishing" your own notebooks, and [contact me](mailto:matteo.bonfanti@fht.org) with suggestions for improvements.
+
+   Html versions of the most important scripts in the GitHub repository of the [Neural Organoid Hormonal Atlas](biorxiv doi).
 
 final: |
-   Here you can put some final remarks.
-   These will be appended at the end of the README / index page.
 
 pages:
-
-  Test Notebook:
-    notebook: "prova.ipynb"
-    description: |
-      This is a **test notebook**. A very basic example of notebook, just to exemplify how the
-      GitHub Actions defined in this repository work.
-      
-      If you want to add your own notebooks, just put the ipynb files in the root project folder and then
-      customize the "pages" section of the [config.yaml](https://github.com/matbonfanti/project-template/blob/main/resources/config.yaml)
-      file by including the notebooks that need to be indexed. The "notebook" attribute defines the name
-      of the ipynb file and the "description" attribute contains a descriptive string that will be
-      included in the README and html index.
-
-  Test HTML File:
-    notebook: "prova2.html"
-    description: |
-      This is a **test HTML file**. This example shows how HTML files can be directly included in the 
-      final repository and linked from the repository index.
+   GeneExploration_Cheroni2022:
+      notebook: "0_HormonalGenes/exploration_bulkRNASeq/Cheroni_etal2022/GeneExploration.html"
+      description: Exploration of gene expression in Cheroni et al. 2022 bulk RNA-Seq dataset.
+   GeneExploration_BrainSpan:
+      notebook: "0_HormonalGenes/exploration_bulkRNASeq/BrainSpan/GeneExploration.html"
+      description: Exploration of gene expression patterns in the BrainSpan dataset.
+   ExplorationCastaldi:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/ExplorationCastaldi.html"
+      description: Initial exploration of the Castaldi et al. 2025 scRNA-Seq dataset.
+   SEACellsCastaldi-GeneExploration:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/SEACellsCastaldi-GeneExploration.html"
+      description: SEACells-based gene exploration in the Castaldi et al. 2025 scRNA-Seq dataset.
+   ExplorationPolioudakis:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Polioudakis_etal2019/ExplorationPolioudakis.html"
+      description: Initial exploration of the Polioudakis et al. 2019 scRNA-Seq dataset.
+   SEACellsPolioudakis-GeneExploration:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Polioudakis_etal2019/SEACellsPolioudakis-GeneExploration.html"
+      description: SEACells-based gene exploration in the Polioudakis et al. 2019 scRNA-Seq dataset.
+   exploratoryQC_CTL04:
+      notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL04/exploratoryQC_CTL04.html"
+      description: Exploratory quality control of bulk RNA-Seq data for CTL04.
+   exploratoryQC_CTL08:
+      notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL08/exploratoryQC_CTL08.html"
+      description: Exploratory quality control of bulk RNA-Seq data for CTL08.
+   SignaturesCTL04_MainGenes:
+      notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_MainGenes.html"
+      description: Main gene signatures for CTL04 bulk RNA-Seq dataset.
+   SignaturesCTL04_MetabolismGenes:
+      notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_MetabolismGenes.html"
+      description: Metabolism gene signatures for CTL04.
+   SignaturesCTL04_ReceptorGenes:
+      notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_ReceptorGenes.html"
+      description: Receptor gene signatures for CTL04.
+   SignaturesCTL04_TargetGenes:
+      notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_TargetGenes.html"
+      description: Target gene signatures for CTL04.
+   SignaturesCTL08_MainGenes:
+      notebook: "1_bulkRNASeq/2_GeneSignatures/CTL08/SignaturesCTL08_MainGenes.html"
+      description: Main gene signatures for CTL08 bulk RNA-Seq dataset.
+   SignaturesCTL08_MetabolismGenes:
+      notebook: "1_bulkRNASeq/2_GeneSignatures/CTL08/SignaturesCTL08_MetabolismGenes.html"
+      description: Metabolism gene signatures for CTL08.
+   SignaturesCTL08_ReceptorGenes:
+      notebook: "1_bulkRNASeq/2_GeneSignatures/CTL08/SignaturesCTL08_ReceptorGenes.html"
+      description: Receptor gene signatures for CTL08.
+   SignaturesCTL08_TargetGenes:
+      notebook: "1_bulkRNASeq/2_GeneSignatures/CTL08/SignaturesCTL08_TargetGenes.html"
+      description: Target gene signatures for CTL08.
+   DeSeq2_CTL04:
+      notebook: "1_bulkRNASeq/3_DifferentialExpression/CTL04/DeSeq2_CTL04.html"
+      description: DESeq2 differential expression analysis of CTL04 bulk RNA-Seq dataset.
+   DeSeq2_CTL08:
+      notebook: "1_bulkRNASeq/3_DifferentialExpression/CTL08/DeSeq2_CTL08.html"
+      description: DESeq2 differential expression analysis of CTL08 bulk RNA-Seq dataset.
+   TopGO_AhHyd_Agonist_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_Agonist.html"
+      description: topGO GO enrichment for AHR pathway - agonist (CTL04).
+   TopGO_AhHyd_AgvsInh_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_AgvsInh.html"
+      description: topGO GO enrichment for AHR pathway - agonist vs inhibitor (CTL04).
+   TopGO_AhHyd_Inhibitor_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_Inhibitor.html"
+      description: topGO GO enrichment for AHR pathway - inhibitor (CTL04).
+   TopGO_Andr_Agonist_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Andr_Agonist.html"
+      description: topGO GO enrichment for Androgen pathway - agonist (CTL04).
+   TopGO_Andr_AgvsInh_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Andr_AgvsInh.html"
+      description: topGO GO enrichment for Androgen pathway - agonist vs inhibitor (CTL04).
+   TopGO_Estr_AgvsInh_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Estr_AgvsInh.html"
+      description: topGO GO enrichment for Estrogen pathway - agonist vs inhibitor (CTL04).
+   TopGO_Estr_Inhibitor_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Estr_Inhibitor.html"
+      description: topGO GO enrichment for Estrogen pathway - inhibitor (CTL04).
+   TopGO_GC_AgvsInh_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_GC_AgvsInh.html"
+      description: topGO GO enrichment for Glucocorticoid pathway - agonist vs inhibitor (CTL04).
+   TopGO_GC_Inhibitor_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_GC_Inhibitor.html"
+      description: topGO GO enrichment for Glucocorticoid pathway - inhibitor (CTL04).
+   TopGO_LivX_AgvsInh_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_LivX_AgvsInh.html"
+      description: topGO GO enrichment for Liver X receptor pathway - agonist vs inhibitor (CTL04).
+   TopGO_LivX_Inhibitor_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_LivX_Inhibitor.html"
+      description: topGO GO enrichment for Liver X receptor pathway - inhibitor (CTL04).
+   TopGO_Ret_Agonist_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_Agonist.html"
+      description: topGO GO enrichment for Retinoid pathway - agonist (CTL04).
+   TopGO_Ret_AgvsInh_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_AgvsInh.html"
+      description: topGO GO enrichment for Retinoid pathway - agonist vs inhibitor (CTL04).
+   TopGO_Ret_Inhibitor_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_Inhibitor.html"
+      description: topGO GO enrichment for Retinoid pathway - inhibitor (CTL04).
+   TopGO_Thyr_Agonist_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_Agonist.html"
+      description: topGO GO enrichment for Thyroid pathway - agonist (CTL04).
+   TopGO_Thyr_AgvsInh_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_AgvsInh.html"
+      description: topGO GO enrichment for Thyroid pathway - agonist vs inhibitor (CTL04).
+   TopGO_Thyr_Inhibitor_CTL04:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_Inhibitor.html"
+      description: topGO GO enrichment for Thyroid pathway - inhibitor (CTL04).
+   TopGO_AhHyd_AgvsInh_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_AhHyd_AgvsInh.html"
+      description: topGO GO enrichment for AHR pathway - agonist vs inhibitor (CTL08).
+   TopGO_Estr_Agonist_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Estr_Agonist.html"
+      description: topGO GO enrichment for Estrogen pathway - agonist (CTL08).
+   TopGO_GC_AgvsInh_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_GC_AgvsInh.html"
+      description: topGO GO enrichment for Glucocorticoid pathway - agonist vs inhibitor (CTL08).
+   TopGO_GC_Inhibitor_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_GC_Inhibitor.html"
+      description: topGO GO enrichment for Glucocorticoid pathway - inhibitor (CTL08).
+   TopGO_LivX_Agonist_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_LivX_Agonist.html"
+      description: topGO GO enrichment for Liver X receptor pathway - agonist (CTL08).
+   TopGO_LivX_AgvsInh_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_LivX_AgvsInh.html"
+      description: topGO GO enrichment for Liver X receptor pathway - agonist vs inhibitor (CTL08).
+   TopGO_Ret_Agonist_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Ret_Agonist.html"
+      description: topGO GO enrichment for Retinoid pathway - agonist (CTL08).
+   TopGO_Ret_AgvsInh_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Ret_AgvsInh.html"
+      description: topGO GO enrichment for Retinoid pathway - agonist vs inhibitor (CTL08).
+   TopGO_Thyr_Agonist_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_Agonist.html"
+      description: topGO GO enrichment for Thyroid pathway - agonist (CTL08).
+   TopGO_Thyr_AgvsInh_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_AgvsInh.html"
+      description: topGO GO enrichment for Thyroid pathway - agonist vs inhibitor (CTL08).
+   TopGO_Thyr_Inhibitor_CTL08:
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_Inhibitor.html"
+      description: topGO GO enrichment for Thyroid pathway - inhibitor (CTL08).
+   CTL04vsCTL08_Scatterplots:
+      notebook: "1_bulkRNASeq/5_DEGsCharacterization/BothLines/CTL04vsCTL08_Scatterplots.html"
+      description: Scatterplots comparing DEGs between CTL04 and CTL08.
+   DEGsOverlap_CTL04:
+      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL04/DEGsOverlap.html"
+      description: Overlap of differentially expressed genes for CTL04.
+   HeatmapsOverlappingDEGs_CTL04:
+      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL04/HeatmapsOverlappingDEGs.html"
+      description: Heatmaps of overlapping DEGs for CTL04.
+   DEGsOverlap_CTL08:
+      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL08/DEGsOverlap.html"
+      description: Overlap of differentially expressed genes for CTL08.
+   1_NetworkGeneration:
+      notebook: "1_bulkRNASeq/6_WGCNA/1_NetworkGeneration.html"
+      description: WGCNA network construction for bulk RNA-Seq.
+   2_ModuleCharacterization:
+      notebook: "1_bulkRNASeq/6_WGCNA/2_ModuleCharacterization.html"
+      description: Characterization of WGCNA modules for bulk RNA-Seq.
+   3_ModuleFunctional:
+      notebook: "1_bulkRNASeq/6_WGCNA/3_ModuleFunctional.html"
+      description: Functional analysis of WGCNA modules for bulk RNA-Seq.
+   1_load_cellranger_data:
+      notebook: "2_scRNASeq/1_load_cellranger_data.ipynb"
+      description: Load Cell Ranger outputs into the scRNA-Seq workflow.
+   2_Integrate_data:
+      notebook: "2_scRNASeq/2_Integrate_data.ipynb"
+      description: Integrate scRNA-Seq datasets.
+   3.2_StressSignatures_filt_hormones:
+      notebook: "2_scRNASeq/3.2_StressSignatures_filt_hormones.ipynb"
+      description: Stress signature analysis.
+   3.3_StressSignatures_filt_androgens:
+      notebook: "2_scRNASeq/3.3_StressSignatures_filt_androgens.ipynb"
+      description: Stress signature analysis - androgen.
+   3_QC_filt:
+      notebook: "2_scRNASeq/3_QC_filt.ipynb"
+      description: Quality control and filtering of scRNA-Seq data.
+   5.0_Explo_controls:
+      notebook: "2_scRNASeq/5.0_Explo_controls.ipynb"
+      description: Exploratory analysis - control samples.
+   5.1_Explo_hormones:
+      notebook: "2_scRNASeq/5.1_Explo_hormones.ipynb"
+      description: Exploratory analysis - hormones samples.
+   5.4_Explo_androgen:
+      notebook: "2_scRNASeq/5.4_Explo_androgen.ipynb"
+      description: Exploratory analysis - androgen samples.
+   6.1_HVGs_hormones:
+      notebook: "2_scRNASeq/6.1_HVGs_hormones.ipynb"
+      description: Highly variable genes.
+   6.3_HVGs_androgens:
+      notebook: "2_scRNASeq/6.3_HVGs_androgens.ipynb"
+      description: Highly variable genes - androgens.
+   10.1_Androgen_substudy_DA:
+      notebook: "2_scRNASeq/androgen_substudy/10.1_Androgen_substudy_DA.ipynb"
+      description: Androgen substudy - differential abundance.
+   10.2_Hormones_substudy_LineMagnification_Neurons:
+      notebook: "2_scRNASeq/hormones_substudy/10.2_Hormones_substudy_LineMagnification_Neurons.ipynb"
+      description: Hormones substudy - differential expression analysis for neurons.
+   10.2_Hormones_substudy_LineMagnification_Progenitors:
+      notebook: "2_scRNASeq/hormones_substudy/10.2_Hormones_substudy_LineMagnification_Progenitors.ipynb"
+      description: Hormones substudy - differential expression analysis for progenitors.
+   11.1_Hormones_substudy_LineMagnification_Progenitors_DA_divided:
+      notebook: "2_scRNASeq/hormones_substudy/11.1_Hormones_substudy_LineMagnification_Progenitors_DA_divided.ipynb"
+      description: Hormones substudy - differential abundance analysis and WGCNA for progenitors.
+   11.2_Hormones_substudy_LineMagnification_Neurons_DA_divided:
+      notebook: "2_scRNASeq/hormones_substudy/11.2_Hormones_substudy_LineMagnification_Neurons_DA_divided.ipynb"
+      description: Hormones substudy - differential abundance analysis and WGCNA for neurons.
+   WGCNAModuleFunctional:
+      notebook: "2_scRNASeq/hormones_substudy/WGCNAModuleFunctional.html"
+      description: Functional characterization of WGCNA modules from scRNAseq dataset.
+   endpoints_PCA_analysis:
+      notebook: "3_ImageAnalysis/notebooks/morphological_features/endpoints_PCA_analysis.ipynb"
+      description: PCA of morphological features of nuclei.
+   plots_positivity_analysis_measurements:
+      notebook: "3_ImageAnalysis/notebooks/plot_markers/plots_positivity_analysis_measurements.ipynb"
+      description: Comparison of proliferation and neuronal markers across exposures in IF.
+   endpoints_plot_representative_images_MIX1:
+      notebook: "3_ImageAnalysis/notebooks/representative_images/endpoints_plot_representative_images_MIX1.ipynb"
+      description: Representative images of antibodies MIX1 exposed organoids.
+   endpoints_plot_representative_images_MIX2:
+      notebook: "3_ImageAnalysis/notebooks/representative_images/endpoints_plot_representative_images_MIX2.ipynb"
+      description: Representative images of antibodies MIX2 exposed organoids.
+   SteroidomicsVis:
+      notebook: "4_steroidomics/SteroidomicsVis.html"
+      description: Visualization of steroidomics data.
+   Steroidomics_WGCNA:
+      notebook: "4_steroidomics/Steroidomics_WGCNA.html"
+      description: Comparison of steroidomics data with weighted gene co-expression analysis modules form bulkRNAseq.
