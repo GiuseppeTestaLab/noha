@@ -64,100 +64,100 @@ pages:
       notebook: "1_bulkRNASeq/3_DifferentialExpression/CTL08/DeSeq2_CTL08.html"
       description: DESeq2 differential expression analysis of CTL08 bulk RNA-Seq dataset.
    TopGO_AhHyd_Agonist_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_Agonist.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_Agonist_CTL04.html"
       description: topGO GO enrichment for AHR pathway - agonist (CTL04).
    TopGO_AhHyd_AgvsInh_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_AgvsInh_CTL04.html"
       description: topGO GO enrichment for AHR pathway - agonist vs inhibitor (CTL04).
    TopGO_AhHyd_Inhibitor_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_Inhibitor.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_Inhibitor_CTL04.html"
       description: topGO GO enrichment for AHR pathway - inhibitor (CTL04).
    TopGO_Andr_Agonist_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Andr_Agonist.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Andr_Agonist_CTL04.html"
       description: topGO GO enrichment for Androgen pathway - agonist (CTL04).
    TopGO_Andr_AgvsInh_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Andr_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Andr_AgvsInh_CTL04.html"
       description: topGO GO enrichment for Androgen pathway - agonist vs inhibitor (CTL04).
    TopGO_Estr_AgvsInh_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Estr_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Estr_AgvsInh_CTL04.html"
       description: topGO GO enrichment for Estrogen pathway - agonist vs inhibitor (CTL04).
    TopGO_Estr_Inhibitor_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Estr_Inhibitor.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Estr_Inhibitor_CTL04.html"
       description: topGO GO enrichment for Estrogen pathway - inhibitor (CTL04).
    TopGO_GC_AgvsInh_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_GC_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_GC_AgvsInh_CTL04.html"
       description: topGO GO enrichment for Glucocorticoid pathway - agonist vs inhibitor (CTL04).
    TopGO_GC_Inhibitor_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_GC_Inhibitor.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_GC_Inhibitor_CTL04.html"
       description: topGO GO enrichment for Glucocorticoid pathway - inhibitor (CTL04).
    TopGO_LivX_AgvsInh_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_LivX_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_LivX_AgvsInh_CTL04.html"
       description: topGO GO enrichment for Liver X receptor pathway - agonist vs inhibitor (CTL04).
    TopGO_LivX_Inhibitor_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_LivX_Inhibitor.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_LivX_Inhibitor_CTL04.html"
       description: topGO GO enrichment for Liver X receptor pathway - inhibitor (CTL04).
    TopGO_Ret_Agonist_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_Agonist.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_Agonist_CTL04.html"
       description: topGO GO enrichment for Retinoid pathway - agonist (CTL04).
    TopGO_Ret_AgvsInh_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_AgvsInh_CTL04.html"
       description: topGO GO enrichment for Retinoid pathway - agonist vs inhibitor (CTL04).
    TopGO_Ret_Inhibitor_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_Inhibitor.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_Inhibitor_CTL04.html"
       description: topGO GO enrichment for Retinoid pathway - inhibitor (CTL04).
    TopGO_Thyr_Agonist_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_Agonist.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_Agonist_CTL04.html"
       description: topGO GO enrichment for Thyroid pathway - agonist (CTL04).
    TopGO_Thyr_AgvsInh_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_AgvsInh_CTL04.html"
       description: topGO GO enrichment for Thyroid pathway - agonist vs inhibitor (CTL04).
    TopGO_Thyr_Inhibitor_CTL04:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_Inhibitor.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_Inhibitor_CTL04.html"
       description: topGO GO enrichment for Thyroid pathway - inhibitor (CTL04).
    TopGO_AhHyd_AgvsInh_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_AhHyd_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_AhHyd_AgvsInh_CTL08.html"
       description: topGO GO enrichment for AHR pathway - agonist vs inhibitor (CTL08).
    TopGO_Estr_Agonist_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Estr_Agonist.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Estr_Agonist_CTL08.html"
       description: topGO GO enrichment for Estrogen pathway - agonist (CTL08).
    TopGO_GC_AgvsInh_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_GC_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_GC_AgvsInh_CTL08.html"
       description: topGO GO enrichment for Glucocorticoid pathway - agonist vs inhibitor (CTL08).
    TopGO_GC_Inhibitor_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_GC_Inhibitor.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_GC_Inhibitor_CTL08.html"
       description: topGO GO enrichment for Glucocorticoid pathway - inhibitor (CTL08).
    TopGO_LivX_Agonist_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_LivX_Agonist.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_LivX_Agonist_CTL08.html"
       description: topGO GO enrichment for Liver X receptor pathway - agonist (CTL08).
    TopGO_LivX_AgvsInh_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_LivX_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_LivX_AgvsInh_CTL08.html"
       description: topGO GO enrichment for Liver X receptor pathway - agonist vs inhibitor (CTL08).
    TopGO_Ret_Agonist_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Ret_Agonist.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Ret_Agonist_CTL08.html"
       description: topGO GO enrichment for Retinoid pathway - agonist (CTL08).
    TopGO_Ret_AgvsInh_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Ret_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Ret_AgvsInh_CTL08.html"
       description: topGO GO enrichment for Retinoid pathway - agonist vs inhibitor (CTL08).
    TopGO_Thyr_Agonist_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_Agonist.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_Agonist_CTL08.html"
       description: topGO GO enrichment for Thyroid pathway - agonist (CTL08).
    TopGO_Thyr_AgvsInh_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_AgvsInh.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_AgvsInh_CTL08.html"
       description: topGO GO enrichment for Thyroid pathway - agonist vs inhibitor (CTL08).
    TopGO_Thyr_Inhibitor_CTL08:
-      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_Inhibitor.html"
+      notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_Inhibitor_CTL08.html"
       description: topGO GO enrichment for Thyroid pathway - inhibitor (CTL08).
    CTL04vsCTL08_Scatterplots:
       notebook: "1_bulkRNASeq/5_DEGsCharacterization/BothLines/CTL04vsCTL08_Scatterplots.html"
       description: Scatterplots comparing DEGs between CTL04 and CTL08.
    DEGsOverlap_CTL04:
-      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL04/DEGsOverlap.html"
+      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL04/DEGsOverlap_CTL04.html"
       description: Overlap of differentially expressed genes for CTL04.
    HeatmapsOverlappingDEGs_CTL04:
-      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL04/HeatmapsOverlappingDEGs.html"
+      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL04/HeatmapsOverlappingDEGs_CTL04.html"
       description: Heatmaps of overlapping DEGs for CTL04.
    DEGsOverlap_CTL08:
-      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL08/DEGsOverlap.html"
+      notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL08/DEGsOverlap_CTL08.html"
       description: Overlap of differentially expressed genes for CTL08.
    1_NetworkGeneration:
       notebook: "1_bulkRNASeq/6_WGCNA/1_NetworkGeneration.html"
