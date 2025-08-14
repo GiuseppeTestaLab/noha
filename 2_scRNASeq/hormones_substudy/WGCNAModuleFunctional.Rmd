@@ -1,0 +1,558 @@
+---
+title: "Functional enrichment analysis with TopGO of WGCNA modules from scRNAseq"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    OutputFolder: ''
+---
+
+## 1. Environment Set Up
+
+### 1.1 Values of RMarkdown parameters
+
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+```{r EnvironmentSetupII, collapse=TRUE}
+library(dplyr)
+library(ggplot2)
+library(gridExtra)
+
+library(viridis)
+library(SummarizedExperiment)
+
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(topGO)
+```
+
+```{r FolderSetting}
+OutputFolder <- params$OutputFolder
+```
+
+
+### 1.2 Helper functions
+
+```{r, collapse=TRUE}
+source('../1_bulkRNASeq/6_WGCNA/WGCNAHelper.R')
+```
+
+****
+
+## 2. Data Upload
+
+```{r, collapse=TRUE}
+# List of paths and corresponding names
+paths <- list(
+  EDCs_Neurons = "/group/testa/Users/davide.castaldi/ENDPOINTS_sc/EDCs_substudy/EDCs_substudy_Neurons_DifferentialModulesGenes/topGoPlot/",
+  EDCs_Progenitors = "/group/testa/Users/davide.castaldi/ENDPOINTS_sc/EDCs_substudy/EDCs_substudy_Progenitors_DifferentialModulesGenes/topGoPlot/",
+  hormones_Progenitors = "/group/testa/Users/davide.castaldi/ENDPOINTS_sc/hormones_substudy/hormones_substudy_Progenitors_DifferentialModulesGenes/topGoPlot/",
+  hormones_Neurons = "/group/testa/Users/davide.castaldi/ENDPOINTS_sc/hormones_substudy/hormones_substudy_Neurons_DifferentialModulesGenes/topGoPlot/"
+)
+
+# Function to build GeneVectors list for a given path
+buildGeneVector <- function(dir_path) {
+  all_files <- list.files(dir_path, full.names = TRUE)
+  
+  # Get all unique module names based on background file pattern
+  bg_files <- grep("_background.txt$", all_files, value = TRUE)
+  modules <- gsub(".*module([^.]+)\\..*", "\\1", bg_files)
+  
+  result <- list()
+  
+  for (mod in modules) {
+    # Match background and top200 files
+    bg_file <- list.files(dir_path, pattern = paste0("module", mod, ".*_background.txt$"), full.names = TRUE)
+    top_file <- list.files(dir_path, pattern = paste0("module", mod, ".*_top200Genes.txt$"), full.names = TRUE)
+    
+    # Skip if either file is missing
+    if (length(bg_file) == 0 || length(top_file) == 0) {
+      warning(paste("Missing file for module:", mod))
+      next
+    }
+    
+    # Read genes
+    bg_genes <- readLines(bg_file)
+    top_genes <- readLines(top_file)
+    
+    # Create named vector of 0s and 1s
+    gene_vector <- as.integer(bg_genes %in% top_genes)
+    names(gene_vector) <- bg_genes
+    
+    # Convert to factor (0 or 1 levels)
+    result[[mod]] <- factor(gene_vector, levels = c(0, 1))
+  }
+  
+  return(result)
+}
+```
+
+****
+
+## 3. Gene Ontology Analysis - hormones progenitor
+
+```{r, collapse=TRUE}
+GeneVectors <- buildGeneVector(paths$hormones_Progenitors) %>% as.vector()
+modules <- names(GeneVectors)
+```
+
+### 3.1 Biological Process
+
+```{r, collapse=TRUE}
+ResBP <- list()
+
+for(i in 1:length(modules)){
+  BPann <- topGO::annFUN.org(whichOnto="BP", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=BPann, ontology='BP', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant BP terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResBP[[i]] <- Res
+  names(ResBP)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_BP.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+```{r, collapse=TRUE}
+GOPlots <- list()
+
+for(i in 1:length(modules)){
+  if (!all(is.na(ResBP[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResBP[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$BP_Bar[[i]] <- Plot
+    names(GOPlots$BP_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$BP_Bar, ncol = 3))
+```
+
+### 3.2 Molecular Function
+
+```{r, collapse=TRUE}
+ResMF <- list()
+
+for(i in 1:length(modules)){
+  MFann <- topGO::annFUN.org(whichOnto="MF", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=MFann, ontology='MF', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant MF terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResMF[[i]] <- Res
+  names(ResMF)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_MF.txt'), sep='\t', row.names=FALSE)
+}
+```
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  if (!all(is.na(ResMF[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResMF[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$MF_Bar[[i]] <- Plot
+    names(GOPlots$MF_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$MF_Bar, ncol = 3))
+```
+
+### 3.3 Cellular Component
+
+```{r, collapse=TRUE}
+ResCC <- list()
+
+for(i in 1:length(modules)){
+  CCann <- topGO::annFUN.org(whichOnto="CC", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=CCann, ontology='CC', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant CC terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResCC[[i]] <- Res
+  names(ResCC)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_CC-.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  if (!all(is.na(ResCC[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResCC[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$CC_Bar[[i]] <- Plot
+    names(GOPlots$CC_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$CC_Bar, ncol = 3))
+```
+
+## 4. Gene Ontology Analysis - hormones neurons
+
+```{r, collapse=TRUE}
+GeneVectors <- buildGeneVector(paths$hormones_Neurons)
+modules <- names(GeneVectors)
+```
+
+### 4.1 Biological Process
+
+```{r, collapse=TRUE}
+ResBP <- list()
+
+for(i in 1:length(modules)){
+  BPann <- topGO::annFUN.org(whichOnto="BP", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=BPann, ontology='BP', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant BP terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResBP[[i]] <- Res
+  names(ResBP)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_BP.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+```{r, collapse=TRUE}
+GOPlots <- list()
+
+for(i in 1:length(modules)){
+  if (!all(is.na(ResBP[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResBP[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$BP_Bar[[i]] <- Plot
+    names(GOPlots$BP_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$BP_Bar, ncol = 3))
+```
+
+### 4.2 Molecular Function
+
+```{r, collapse=TRUE}
+ResMF <- list()
+
+for(i in 1:length(modules)){
+  MFann <- topGO::annFUN.org(whichOnto="MF", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=MFann, ontology='MF', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant MF terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResMF[[i]] <- Res
+  names(ResMF)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_MF.txt'), sep='\t', row.names=FALSE)
+}
+```
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  if (!all(is.na(ResMF[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResMF[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$MF_Bar[[i]] <- Plot
+    names(GOPlots$MF_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$MF_Bar, ncol = 3))
+```
+
+### 4.3 Cellular Component
+
+```{r, collapse=TRUE}
+ResCC <- list()
+
+for(i in 1:length(modules)){
+  CCann <- topGO::annFUN.org(whichOnto="CC", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=CCann, ontology='CC', 
+                      description=NULL, nodeSize=15, algorithm='weight01', 
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant CC terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResCC[[i]] <- Res
+  names(ResCC)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_CC-.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  if (!all(is.na(ResCC[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResCC[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$CC_Bar[[i]] <- Plot
+    names(GOPlots$CC_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$CC_Bar, ncol = 3))
+```
+
+## 5. Gene Ontology Analysis - edc progenitors
+
+```{r, collapse=TRUE}
+GeneVectors <- buildGeneVector(paths$EDCs_Progenitors)
+modules <- names(GeneVectors)
+```
+
+### 5.1 Biological Process
+
+```{r, collapse=TRUE}
+ResBP <- list()
+
+for(i in 1:length(modules)){
+  paste("Module: ", modules[i])
+  BPann <- topGO::annFUN.org(whichOnto="BP", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=BPann, ontology='BP',
+                      description=NULL, nodeSize=15, algorithm='weight01',
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant BP terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResBP[[i]] <- Res
+  names(ResBP)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_BP.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+```{r, collapse=TRUE}
+GOPlots <- list()
+
+for(i in 1:length(modules)){
+  if (!all(is.na(ResBP[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResBP[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$BP_Bar[[i]] <- Plot
+    names(GOPlots$BP_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$BP_Bar, ncol = 3))
+```
+
+### 5.2 Molecular Function
+
+```{r, collapse=TRUE}
+ResMF <- list()
+
+for(i in 1:length(modules)){
+  MFann <- topGO::annFUN.org(whichOnto="MF", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=MFann, ontology='MF',
+                      description=NULL, nodeSize=15, algorithm='weight01',
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant MF terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResMF[[i]] <- Res
+  names(ResMF)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_MF.txt'), sep='\t', row.names=FALSE)
+}
+```
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  if (!all(is.na(ResMF[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResMF[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$MF_Bar[[i]] <- Plot
+    names(GOPlots$MF_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$MF_Bar, ncol = 3))
+```
+
+### 5.3 Cellular Component
+
+```{r, collapse=TRUE}
+ResCC <- list()
+
+for(i in 1:length(modules)){
+  CCann <- topGO::annFUN.org(whichOnto="CC", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=CCann, ontology='CC',
+                      description=NULL, nodeSize=15, algorithm='weight01',
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant CC terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResCC[[i]] <- Res
+  names(ResCC)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_CC-.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  if (!all(is.na(ResCC[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResCC[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$CC_Bar[[i]] <- Plot
+    names(GOPlots$CC_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$CC_Bar, ncol = 3))
+```
+
+## 6. Gene Ontology Analysis - edc neurons
+
+```{r, collapse=TRUE}
+GeneVectors <- buildGeneVector(paths$EDCs_Neurons)
+modules <- names(GeneVectors)
+```
+
+### 6.1 Biological Process
+
+```{r, collapse=TRUE}
+ResBP <- list()
+
+for(i in 1:length(modules)){
+  BPann <- topGO::annFUN.org(whichOnto="BP", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=BPann, ontology='BP',
+                      description=NULL, nodeSize=15, algorithm='weight01',
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant BP terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResBP[[i]] <- Res
+  names(ResBP)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_BP.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+```{r, collapse=TRUE}
+GOPlots <- list()
+
+for(i in 1:length(modules)){
+  if (!all(is.na(ResBP[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResBP[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$BP_Bar[[i]] <- Plot
+    names(GOPlots$BP_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$BP_Bar, ncol = 3))
+```
+
+### 6.2 Molecular Function
+
+```{r, collapse=TRUE}
+ResMF <- list()
+
+for(i in 1:length(modules)){
+  MFann <- topGO::annFUN.org(whichOnto="MF", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=MFann, ontology='MF',
+                      description=NULL, nodeSize=15, algorithm='weight01',
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant MF terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResMF[[i]] <- Res
+  names(ResMF)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_MF.txt'), sep='\t', row.names=FALSE)
+}
+```
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  if (!all(is.na(ResMF[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResMF[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$MF_Bar[[i]] <- Plot
+    names(GOPlots$MF_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$MF_Bar, ncol = 3))
+```
+
+### 6.3 Cellular Component
+
+```{r, collapse=TRUE}
+ResCC <- list()
+
+for(i in 1:length(modules)){
+  CCann <- topGO::annFUN.org(whichOnto="CC", feasibleGenes=names(GeneVectors[[modules[i]]]), mapping="org.Hs.eg.db", ID="symbol") %>% topGO::inverseList()
+  Res <- topGOResults(Genes=GeneVectors[[modules[i]]], gene2GO=CCann, ontology='CC',
+                      description=NULL, nodeSize=15, algorithm='weight01',
+                      statistic='fisher', EnTh=2, PvalTh=0.01, minTerms=12)
+  print(paste('Significant CC terms for', modules[i], 'module:', dim(Res$ResSel)[1]))
+  ResCC[[i]] <- Res
+  names(ResCC)[i] <- modules[i]
+  #write.table(Res$ResSel, file=paste0(OutputFolder, modules[i], '_CC-.txt'), sep='\t', row.names=FALSE)
+}
+
+```
+
+```{r, collapse=TRUE}
+for(i in 1:length(modules)){
+  if (!all(is.na(ResCC[[i]]$ResSel))) {
+    Plot <- topGOBarplot(ResCC[[i]]$ResSel, terms=12, pvalTh=0.01, title=modules[i], palette=NULL)
+    GOPlots$CC_Bar[[i]] <- Plot
+    names(GOPlots$CC_Bar)[i] <- modules[i]
+    }else{
+      cat(modules[i], " module has no significant selected terms")
+      next}
+}
+```
+
+```{r, fig.width=20, fig.height=20}
+do.call(grid.arrange, c(GOPlots$CC_Bar, ncol = 3))
+```
+
+## 7. Savings
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r SessionInfo}
+Date
+SessionInfo
+``` 
+
+
+
+
