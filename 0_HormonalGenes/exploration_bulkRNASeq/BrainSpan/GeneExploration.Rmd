@@ -1,0 +1,237 @@
+---
+title: "Exploration of receptors genes on BrainSpan samples"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'BrainSpan'
+    RpkmListPrel: '~/DataDir/ExternalData/BulkData/BrainSpan/OutputPreparation/PreCortexRpkmList.rds'
+    OutputFolder: '~/DataDir/ExternalData/BulkData/BrainSpan/Output/'
+---
+
+### Analysis purpose
+
+Check the expression levels and behavior through post-conceptional weeks from Brainspan (pre-natal cortex samples).
+
+### 1. SetUp
+
+Library and source upload
+```{r, collapse=TRUE}
+library(tidyr)
+library(dplyr)
+library(ggplot2)
+```
+
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+Source helper file
+```{r, collapse=TRUE}
+source("../SignatureHelper.R") 
+```
+
+
+Folder organization
+```{r FolderSetting, collapse=TRUE}
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+  dir.create(OutputFolder, showWarnings=TRUE, recursive=TRUE)
+}
+```
+
+****
+
+### 2. Data Upload
+
+I upload:
+
+ * RpkmList: contains gene expression levels for Brainspan in LogRpkm
+ * Signatures: list of genes retrieved from different literature sources
+
+
+#### 2.1 LogRpkm expression data
+
+##### Load data
+
+```{r, collapse=TRUE}
+RpkmListPrel <- readRDS(params$RpkmListPrel)
+summary(row.names(RpkmListPrel$Log2Rpkm))
+```
+
+##### Filter out outliers PCW
+
+```{r, collapse=TRUE}
+Sel <- (!(RpkmListPrel$Meta$Stage %in% c(25, 26, 35))) #I eliminate the PCW that were found as outliers
+
+RpkmList <- list()
+RpkmList$Rpkm <- RpkmListPrel$Rpkm[, Sel]
+RpkmList$Log2Rpkm <- RpkmListPrel$Log2Rpkm[, Sel]
+RpkmList$Meta <- RpkmListPrel$Meta[Sel, ]
+
+if(!identical(colnames(RpkmList$Log2Rpkm)[1:157], RpkmList$Meta$ID)){
+  stop('Inconsistency in Expression and Metadata matrices!')
+  }
+
+### Check for duplicated gene names
+table(duplicated(RpkmList$Log2Rpkm$GeneName))
+```
+
+After removal of week 25, 26 and 35:
+
+ * The dataset is structured in `r dim(RpkmList$Log2Rpkm)[1]` genes measured in `r dim(RpkmList$Log2Rpkm)[2]-4` samples. 
+ * The following column (sample) metadata are available: `r names(RpkmList$Meta)`
+
+
+#### 2.2 Gene signatures
+
+```{r, collapse=TRUE}
+GS <- read.table(file = '~/DataDir/ExternalData/Receptors/ReceptorsComplete.txt', 
+                         sep='\t', header=TRUE)
+colnames(GS)[2] <- "Population"
+```
+
+```{r}
+as.data.frame(GS) %>% 
+  DT::datatable(class='hover', rownames=FALSE, caption='Hormonal receptors', 
+                filter='top', escape=TRUE, extension='Buttons', 
+                options=list(pageLength=10, dom='Bfrtip', 
+                             buttons=list(I('colvis'), c('csv', 'excel')))
+                )
+```
+
+```{r}
+GSUnique <- GS[!duplicated(GS$GeneName),]
+GSUnique$GeneName[!(GSUnique$GeneName %in% RpkmList$Log2Rpkm$GeneName)]
+GSUnique <- GSUnique[(GSUnique$GeneName %in% RpkmList$Log2Rpkm$GeneName), ]
+
+summary(GS)
+```
+
+The signature is composed by `r dim(GSUnique)[1]`genes classified in `r length(unique(GSUnique$Population))` categories.    
+
+****
+
+### 3. Retrieve fetal signature gene expression in LogRpkm
+
+CuratedSig lists is created: 
+
+ * LogRpkm by LogFpkmSignature function: stores expression values in logRpkm for signature genes
+ * LogRpkmMean by SigLogFpkmMean function: calculate mean expression for each gene in each stage 
+
+```{r, collapse=TRUE}
+CuratedSig <- list()
+```
+
+
+```{r, collapse=TRUE}
+# Retrieval of expression values for gene signatures
+CuratedSig$LogRpkm <- LogFpkmSignature(MetaData=RpkmList$Meta, LogFpkmData=RpkmList$Log2Rpkm[,1:157],
+                                        GeneSig=unique(GSUnique$GeneName))
+
+print(paste('Genes: ', dim(CuratedSig$LogRpkm)[2]-4))
+print(paste('Samples: ', dim(CuratedSig$LogRpkm)[1]))
+  
+# Calculation of mean expression across stages
+CuratedSig$LogRpkmMean <- SigLogFpkmMean(CuratedSig$LogRpkm, StartCol=10,
+                                                             GroupCol='Stage', MetaInfo=GSUnique,
+                                                             Arrange='Population')
+
+print(paste('MeanLog2Rpkm Genes', dim(CuratedSig$LogRpkmMean)[1]))
+print(paste('Min Value', round(min(CuratedSig$LogRpkmMean$ExpMean), 2)))
+print(paste('Max Value', round(max(CuratedSig$LogRpkmMean$ExpMean), 2)))
+```    
+
+    
+### 4. Visualization by lollipop
+
+```{r, collapse=TRUE, fig.height=10, fig.width=6}
+ColVec <- scales::hue_pal()(12)
+
+LogRpkmMeanRel <- CuratedSig$LogRpkmMean %>% dplyr::mutate(Stage=factor(Stage, levels=c('8', '9', '12', '13', '16', 
+                                                                                            '17', '19', '21', '24', '37'))) 
+
+CuratedSig$Lolli <- LolliPopCols(Data=LogRpkmMeanRel, PointSize=2,
+                                                   SegSize=1, yLow=0, yHigh=7, CeilDown=0, 
+                                                   CeilUp=7, unit='LogRpkm', cols=ColVec,
+                                                   Shape=15, GeneSize=4.2, filterZero=FALSE)
+
+
+CuratedSig$Lolli
+```
+
+```{r, collapse=TRUE}
+ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'BSpan_LogRpkm.pdf'), width=10, height=10)
+ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'BSpan_LogRpkm.png'), width=10, height=10)
+```
+
+
+****
+
+### 5. Calculate Delta Log2Fpkm compared to a reference stage
+
+```{r, collapse=TRUE}
+CuratedSig$LogRpkmDelta <- DeltaLogFpkmMean(CuratedSig$LogRpkmMean, 
+                                                             GroupCol='Stage', DiscardStage=NULL, 
+                                                             RefStage='S8', Arrange='Population', 
+                                                             MetaCols=2, Th=0, Substitute=NA)
+
+print(paste('DeltaLogFpkm Genes', dim(CuratedSig$LogRpkmDelta)[1]))
+print(paste('Min Value', round(min(CuratedSig$LogRpkmDelta$ExpMean, na.rm=T),2)))
+print(paste('Max Value', round(max(CuratedSig$LogRpkmDelta$ExpMean, na.rm=T),2)))
+```    
+
+    
+****
+
+### 6. Visualization by lollipop of delta expression levels compared to the earliest stage
+
+```{r, collapse=TRUE, fig.height=10, fig.width=6}
+LogRpkmDeltaRel <- CuratedSig$LogRpkmDelta %>% dplyr::mutate(Stage=factor(Stage, levels=c('D2_S9_S8', 'D3_S12_S8', 'D4_S13_S8', 'D5_S16_S8', 'D6_S17_S8', 
+                                                                                            'D7_S19_S8', 'D8_S21_S8', 'D9_S24_S8',  'D10_S37_S8'))) 
+
+CuratedSig$LolliDelta <- LolliPopCols(LogRpkmDeltaRel, PointSize=4, SegSize=1.5,
+                                            cols=ColVec, yLow=-2, yHigh=4,  CeilUp=4, CeilDown=-2, 
+                                            unit='DeltaLogRpkm', Shape=18, GeneSize=5, filterZero=FALSE)
+CuratedSig$LolliDelta
+```
+
+
+```{r, collapse=TRUE}
+ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder,  'BSpan_DeltaLogRpkm.pdf'), width=10, height=10)
+ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'BSpan_DeltaLogRpkm.png'), width=10, height=10)
+```
+
+
+****
+
+
+### 7. Save information 
+
+```{r Save, collapse=TRUE}
+save.image(file=paste0(OutputFolder, 'AnalysisWorkspace.RData'))
+```
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r}
+Date
+SessionInfo
+```
+
+
+
+
+
+

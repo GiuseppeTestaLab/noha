@@ -42,7 +42,7 @@ jobs:
         run: |
           mkdir notebooks-html/
 
-          for nb in $(find 2_scRNASeq 3_ImageAnalysis -type f -name "*.ipynb"); do
+          for nb in $(find 0_HormonalGenes/exploration_scRNASeq 2_scRNASeq 3_ImageAnalysis -type f -name "*.ipynb"); do
               echo "Converting: $nb"
               jupyter nbconvert --to html "$nb" 
               mv $(dirname "$nb")/$(basename "$nb" .ipynb).html notebooks-html/
@@ -51,7 +51,7 @@ jobs:
       #- name: move R html - bulk + steroidomics
       - name: move R html
         run: |
-          for file in $(find 1_bulkRNASeq 2_scRNASeq 4_steroidomics -type f -name "*.html"); do
+          for file in $(find 0_HormonalGenes/exploration_bulkRNASeq 1_bulkRNASeq 2_scRNASeq 4_steroidomics -type f -name "*.html"); do
                 mv $file notebooks-html/
           done 
           

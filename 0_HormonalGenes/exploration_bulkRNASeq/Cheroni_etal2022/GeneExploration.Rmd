@@ -1,0 +1,500 @@
+---
+title: "Exploration of receptors genes on Cheroni et al. samples"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'BenchmarkingOrganoids'
+    CountFile: '~/DataDir/ExternalData/BulkData/BenchmarkingOrganoids/OrgIPSAll_SalmonGeneCounts.txt'
+    DesignFile: '~/DataDir/ExternalData/BulkData/BenchmarkingOrganoids/DesignOrgIPS.txt'
+    GeneAnnotationFile: '~/DataDir/ExternalData/BulkData/BenchmarkingOrganoids/AnnotationDF.txt'
+    OutputFolder: '~/DataDir/ExternalData/BulkData/BenchmarkingOrganoids/OutputOrgIPS/'
+    CpmFilt: 1
+    SampleFilt: 4
+
+---
+
+### 1. Environment Set Up
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(RNASeqBulkExploratory)  #Our Package
+library(DT)
+library(gridExtra)
+library(SummarizedExperiment)
+library(ggplot2)
+library(SEtools)
+library(sechm)
+library(tidyr)
+library(dplyr)
+```
+
+```{r}
+source("../SignatureHelper.R") 
+```
+
+```{r FolderSetting}
+Dataset <- params$Dataset
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+  dir.create(OutputFolder, recursive=FALSE)
+}
+```
+
+
+
+### 2. Data Upload
+
+ * Raw data produced by Salmon alignment 
+ * Experimental design
+ * Gene annotation
+
+
+#### 2.1 Read Count Matrix 
+
+```{r Data_Counts, collapse=TRUE}
+RawCounts <- read.table(params$CountFile, sep='\t', header=TRUE)
+colSums(RawCounts[,-1])
+```
+
+#### 2.2 Design Matrix 
+
+```{r Data_Design, collapse=TRUE}
+Design <- read.table(params$DesignFile, sep='\t', header=TRUE)
+str(Design)
+```
+
+```{r }
+as.data.frame(lapply(Design, factor)) %>% 
+  DT::datatable(class='hover', rownames=FALSE, caption='Sample identity and attributes', 
+                filter='top', escape=TRUE, extension='Buttons', 
+                options=list(pageLength=10, dom='Bfrtip', 
+                             columnDefs=list(list(className='dt-center', targets=c(5:(length(Design)-1)),
+                                                  visible=FALSE)),  #as if indexing starts from 0
+                             buttons=list(I('colvis'), c('csv', 'excel')))
+                )
+```
+
+__The dataset is structured in `r dim(RawCounts)[1]` genes measured in `r dim(RawCounts)[2]-1` samples.__   
+
+#### 2.3 Gene Annotation 
+
+```{r Data_Genes, collapse=TRUE}
+if (is.null(params$GeneAnnotation)==FALSE){
+  GeneAnnotation <- read.table(params$GeneAnnotationFile, sep='\t', header=TRUE)
+  if(identical((RawCounts$Gene), GeneAnnotation$Gene)==FALSE){
+    stop('ERROR! Gene order in count matrix and annotation matrix is not consistent. \n Please specify a data frame with the correct order.')
+  }
+}
+```
+
+```{r Data_GenesII, collapse=TRUE}
+if ('hgnc_symbol' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, HGNCSymbol=hgnc_symbol)
+}
+
+if ('external_gene_name' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, GeneName=external_gene_name)
+}
+
+if ('gene_biotype' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, GeneBiotype=gene_biotype)
+}
+
+if ('chromosome_name' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, Chr=chromosome_name)
+}
+
+if ('start_position' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, Start=start_position)
+}
+
+if ('end_position' %in% colnames(GeneAnnotation)){
+  GeneAnnotation <- dplyr::rename(GeneAnnotation, End=end_position)
+}
+```
+
+### 3. Generation of Summarized Experiment
+
+```{r SE_Check, collapse=TRUE}
+if(identical(colnames(RawCounts)[-1], Design$HRID)==FALSE){
+    stop('ERROR! Gene order in count matrix and annotation matrix is not consistent. \n 
+         Please specify a data frame with the correct order.')
+  }
+```
+
+```{r SE, collapse=TRUE}
+SE <- createSE(countTable=RawCounts, sampleMeta=Design, geneMeta=GeneAnnotation, 
+               roundCounts=TRUE, showDuplicates=TRUE)
+```
+
+SE contains information about `r dim(SE)[1]` genes in `r dim(SE)[2]` samples. 
+
+### 4. Removal of unwanted Biotypes
+
+We decide to select here only protein-coding genes
+
+```{r BiotypeSel, collapse=TRUE}
+SE_Bio <- biotypeSelectSE(SE, lncRNA=FALSE, otherBios=NULL, showRemoved=TRUE)
+
+RemovedGenes <-  rowData(SE)[!(rownames(rowData(SE)) %in% rownames(rowData(SE_Bio))), ]
+```
+
+**After the gene selection based on biotypes, the dataset is structured in `r dim(SE_Bio)[1]` genes measured in `r dim(SE_Bio)[2]` samples. `r dim(RemovedGenes)[1]` have been discarded.**
+
+
+### 5. Additional checks
+
+#### 5.1 Check consistency in sample metadata for SE_bio
+
+```{r}
+if(! identical(names(assays(SE_Bio)$counts), rownames(colData(SE_Bio)))){
+  stop('Inconsistencies in sample metadata for SE object')
+  }
+
+if(! identical(names(assays(SE_Bio)$counts), colData(SE_Bio)$HRID)){
+  stop('Inconsistencies in sample metadata for SE object')
+  }
+
+```
+
+#### 5.2 Gene Lenght
+
+```{r, collapse=TRUE}
+GeneLength <- read.table(file='~/DataDir/ExternalData/BulkData/BenchmarkingOrganoids/GenecodeV27GeneLength.txt', 
+                         sep='\t', header=TRUE)
+```
+
+```{r, collapse=TRUE}
+SelLenght <- dplyr::left_join(as.data.frame(rowData(SE_Bio))[,1:3], GeneLength, by=c('Gene'='Gene'))
+```
+
+
+```{r, collapse=TRUE}
+if(identical(SelLenght$Gene, rowData(SE_Bio)$Gene)){
+  rowData(SE_Bio)$GeneLength <- SelLenght$Length
+  print('Gene Lengh information added to SE')
+} else {
+    print('Information on gene lenght is not compatible with SE object. Gene Lenght information not added to SE')
+}
+```
+
+
+### 6 Gene Filtering
+
+#### 6.1 Setting gene filtering thresholds
+
+```{r FiltThresholds, collapse=TRUE}
+CpmFilt <- params$CpmFilt
+if(is.numeric(CpmFilt)==FALSE){
+  stop('ERROR! Cpm threshold for gene filtering has a non-numeric value')
+}
+
+SampleFilt <- ifelse(params$SampleFilt=='Default', dim(SE_Bio)[2]/2, params$SampleFilt)
+if(is.numeric(SampleFilt)==FALSE){
+  stop('ERROR! Sample threshold for gene filtering has a non-numeric value')
+}
+```
+
+__Genes having an expression lower than `r CpmFilt` in at least `r SampleFilt` samples are filtered out.__
+
+
+#### 6.2 Filter out low expressed genes
+
+ * Compute temporary cpm (without TMM normalization, not stored in SE)
+ * Filter out lowly-expressed genes
+
+```{r SE_Filt, collapse=TRUE}
+SE_Bio$lib.size
+SE_Filt <- filterSE(SE_Bio, cpmTh=CpmFilt, sampleTh=SampleFilt)
+#$lib.size
+```
+
+#### 6.3 Normalize 
+
+ * Re-calculate library size and calculate TMM
+ * Calculate cpm and logcpm (with normalization) and store in SE_Filt
+ * Calculate Fpkm and logfpkm
+
+```{r SE_norm, collapse=TRUE}
+SE_Filt <- normTmmSE(SE_Filt, useNormFactors=TRUE, priorCount=0.25)  
+
+#cpm and logcpm are calculated by normTmmSE
+
+assays(SE_Filt)$fpkm <- edgeR::rpkm(SE_Filt, normalized.lib.sizes = TRUE, gene.length=rowData(SE_Filt)$GeneLength)
+assays(SE_Filt)$logfpkm <- edgeR::rpkm(SE_Filt, normalized.lib.sizes = TRUE, gene.length=rowData(SE_Filt)$GeneLength, 
+                                  log=TRUE, prior.count=0.25)
+```
+
+__After filtering out lowly-expressed genes, the dataset is structured in `r dim(SE_Filt)[1]` genes measured in `r dim(SE_Filt)[2]` samples.__ 
+
+
+### 7. Heatmaps: exploration of receptors
+
+#### 7.1 Preprocessing 
+
+##### 7.1.1 Gene name as row names
+
+For the downstream interrogation, it become useful to have the gene names as SE row names, that are used by sechm for selecting genes. I also have to discard genes with duplicated gene names.  
+
+```{r, collapse=TRUE}
+rownames(SE_Filt) <- rowData(SE_Filt)$GeneName
+SE_Filt <- SE_Filt[!duplicated(rownames(SE_Filt)), ] 
+```
+
+##### 7.1.2 Calculate the fold-change 
+
+I use a function from SEtools to calculate the fold-change compared to the controls. This is done on logcpm.
+
+```{r, collapse=TRUE}
+Day0 <- as.vector(which(SE_Filt$Condition=='Day0'))
+SE_Filt <- SEtools::log2FC(SE_Filt, fromAssay='logcpm', controls=Day0, isLog=TRUE, toAssay='log2FC')
+```
+
+
+##### 7.1.3 Define the color annotation 
+
+```{r, collapse=TRUE}
+metadata(SE_Filt)$anno_colors <- list(Condition = c("Day0" = "#ffff3f", "Day25" = "#eeef20", "Day50" = "#dddf00", "Day100" = "#d4d700", "Day150" = "#bfd200", "Day200" = "#aacc00"), Sex = c("F" = "#f4978e", "M" = "#277da1"))
+```
+
+#### 7.2 Upload gene signature
+
+```{r, collapse=TRUE}
+GS <- read.table(file = '~/DataDir/ExternalData/Receptors/ReceptorsComplete.txt', 
+                         sep='\t', header=TRUE)
+```
+
+```{r }
+as.data.frame(GS) %>% 
+  DT::datatable(class='hover', rownames=FALSE, caption='Hormonal receptors', 
+                filter='top', escape=TRUE, extension='Buttons', 
+                options=list(pageLength=10, dom='Bfrtip', 
+                             buttons=list(I('colvis'), c('csv', 'excel')))
+                )
+```
+
+```{r, collapse=TRUE}
+Genes <- GS %>% dplyr::pull(GeneName)
+
+Genes[! Genes %in% row.names(SE_Filt)]
+
+rowData(SE_Filt)$Signatures <- NA
+for (i in which(rowData(SE_Filt)$GeneName %in% Genes)){
+  gene <- row.names(SE_Filt)[i]
+  rowData(SE_Filt)[i, 'Signatures'] <-GS[GS$GeneName==gene, "Signature"]
+}
+
+colors_sig <- scales::hue_pal()(12)[1:length(unique(GS$Signature))]
+names(colors_sig) <- names(table(GS$Signature))
+metadata(SE_Filt)$anno_colors$Signatures <- colors_sig
+```
+
+__The following genes are not selected as expressed:__ `r paste(Genes[! Genes %in% row.names(SE_Filt)])`. 
+
+```{r}
+colData(SE_Filt)$Condition <- factor(colData(SE_Filt)$Condition, levels = c("Day0", "Day25", "Day50", "Day100", "Day150", "Day200"))
+sorting <- as.data.frame(colData(SE_Filt))%>%dplyr::arrange(Condition)%>%rownames()
+```
+
+
+#### 7.3 Expression levels: logFpkm without scaling
+
+
+```{r logfpkm, collapse=TRUE, fig.width=15, fig.height=14}
+assays(SE_Filt[row.names(SE_Filt) %in% Genes, ])$logfpkm %>% quantile(seq(0,1, by=0.1))
+
+ExpCols <- viridisLite::cividis(length(seq(-10, 7, by=0.2)))
+
+sechm(SE_Filt[, sorting], features=Genes, assayName="logfpkm", gaps_row="Signatures", top_annotation = c("Condition", "Sex"), show_rownames = TRUE, left_annotation = "Signatures", sortRowsOn=NULL, cluster_rows=FALSE, show_colnames=TRUE,
+      hmcols=ExpCols, breaks=seq(-10, 7, by=0.2), column_title = "LogFpkm")
+# breaks FALSE to avoid a symmetrical scale
+```
+
+#### 7.4 Expression levels: scaled logFpkm
+
+```{r scaledlogfpkm, collapse=TRUE, fig.width=15, fig.height=14}
+ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
+
+sechm::sechm(SE_Filt[, sorting], features=Genes, assayName="logfpkm", gaps_row="Signatures", top_annotation = c("Condition", "Sex"),  show_rownames=TRUE, left_annotation = "Signatures", show_colnames=TRUE, sortRowsOn=NULL, cluster_rows=FALSE, hmcols=ScaledCols, do.scale=TRUE, breaks=0.8, column_title = "Scaled LogFpkm")
+```
+
+#### 7.5 Expression levels: scaled logcpm
+
+```{r collapse=TRUE, include=FALSE}
+GS_Exp <- assays(SE_Filt[row.names(SE_Filt) %in% Genes, ])$logcpm
+head(GS_Exp)
+```
+
+```{r scaledlogcpm, collapse=TRUE, fig.width=15, fig.height=14}
+sechm::sechm(SE_Filt[, sorting], features=Genes, assayName="logcpm", gaps_row="Signatures", top_annotation = c("Condition", "Sex"),  show_rownames=TRUE, left_annotation = "Signatures", show_colnames=TRUE, sortRowsOn=NULL, cluster_rows=FALSE, hmcols=ScaledCols, do.scale=TRUE, breaks=0.8, column_title = "Scaled LogCpm")
+```
+
+#### 7.6 Expression levels: Log2FC versus Day0
+
+```{r logFC,    collapse=TRUE, fig.width=15, fig.height=14}
+sechm(SE_Filt[, sorting], features=Genes, assayName="log2FC", gaps_row="Signatures", top_annotation = c("Condition", "Sex"), left_annotation = "Signatures", show_colnames=TRUE, sortRowsOn=NULL, cluster_rows=FALSE,
+      show_rownames = TRUE, hmcols=ScaledCols, 
+      do.scale=FALSE, breaks = 0.85, column_title = "LogFC versus Day0")
+```
+
+### 8. Lollipops: exploration of receptors
+
+#### 8.1 Preprocessing
+
+```{r}
+Design_sorted <- Design %>% dplyr::arrange(factor(Condition, levels = c("Day0", "Day25", "Day50", "Day100", "Day150", "Day200")))
+Design_sorted$Condition <- factor(Design_sorted$Condition, levels = c("Day0", "Day25", "Day50", "Day100", "Day150", "Day200"))
+```
+
+##### 8.1.1 Saving LogFkm values for all samples
+
+```{r, collapse=TRUE}
+LogFpkmDF <- assays(SE_Filt[,sorting])$logfpkm 
+```
+
+##### 8.1.2 Creation of CuratedSig list
+
+CuratedSig list is created: 
+
+ * LogFpkm by LogFpkmSignature function: stores expression values in logFpkm for signature genes
+ * LogFpkmMean by SigLogFpkmMean function: calculate mean expression for each gene in each stage
+
+```{r}
+#prepare Design for functions
+CuratedSig <- list()
+Design_sorted$names <- Design_sorted$InternaUniqueID
+# Check for missing genes
+GS$GeneName[!(GS$GeneName %in% rownames(LogFpkmDF))]
+colnames(GS)[2] <- "Population"
+#excluding the missing ones
+Genes <- GS$GeneName[(GS$GeneName %in% rownames(LogFpkmDF))]
+```
+
+#### 8.2 Expression values for gene signatures
+
+```{r, collapse=TRUE}
+# Retrieval of expression values for gene signatures
+CuratedSig$LogFpkm <- LogFpkmSignature(MetaData=Design_sorted, LogFpkmData=LogFpkmDF, GeneSig=Genes)
+head(CuratedSig$LogFpkm)
+```
+
+#### 8.3 Mean expressions across stages
+
+```{r, collapse=TRUE}
+# Calculation of mean expression across stages
+CuratedSig$LogFpkmMean <- SigLogFpkmMean(CuratedSig$LogFpkm, StartCol=15, GroupCol='Condition', MetaInfo= GS, Arrange='Population')
+CuratedSig$LogFpkmMean
+
+print(paste('MeanLog2Fpkm Genes', dim(CuratedSig$LogFpkmMean)[1]))
+print(paste('Min Value', round(min(CuratedSig$LogFpkmMean$ExpMean), 2)))
+print(paste('Max Value', round(max(CuratedSig$LogFpkmMean$ExpMean), 2)))
+```   
+
+```{r MeanLogFpkm_lolli, collapse=TRUE, fig.height=10, fig.width=6}
+ColVec <- scales::hue_pal()(12)
+
+colnames(CuratedSig$LogFpkmMean)[2] <- "Stage"
+
+CuratedSig$Lolli <- LolliPopCols(Data=CuratedSig$LogFpkmMean, PointSize=2.5,
+                                                   SegSize=1.5, yLow=0, yHigh=7, CeilDown=0, 
+                                                   CeilUp=7, unit='LogFpkm', cols=ColVec,
+                                                   Shape=15, GeneSize=5, filterZero=FALSE)
+CuratedSig$Lolli 
+```
+
+#### 8.4 Delta Log2Fpkm compared to a reference stage: earliest organoid stage (Day 25)
+
+```{r, collapse=TRUE}
+quantile(CuratedSig$LogFpkmMean$ExpMean)
+```
+
+```{r, collapse=TRUE}
+# reference stage for each dataset
+# Retrieval of expression values for gene signatures
+CuratedSig$LogFpkmDelta <- DeltaLogFpkmMean(CuratedSig$LogFpkmMean, GroupCol='Stage', DiscardStage="Day0", 
+                                                             RefStage="SDay25", Arrange='Population', Th=-1.5, Substitute=NA)
+CuratedSig$LogFpkmDelta
+
+print(paste('DeltaLogFpkm Genes', dim(CuratedSig$LogFpkmDelta)[1]))
+print(paste('Min Value', round(min(CuratedSig$LogFpkmDelta$ExpMean, na.rm=T),2)))
+print(paste('Max Value', round(max(CuratedSig$LogFpkmDelta$ExpMean, na.rm=T),2)))
+```
+
+```{r, collapse=TRUE}
+CuratedSig$LogFpkmDelta$Stage[CuratedSig$LogFpkmDelta$Stage=="D2_SDay50_SDay25"] <- "Day50 vs Day25"
+CuratedSig$LogFpkmDelta$Stage[CuratedSig$LogFpkmDelta$Stage=="D3_SDay100_SDay25"] <- "Day100 vs Day25"
+CuratedSig$LogFpkmDelta$Stage[CuratedSig$LogFpkmDelta$Stage=="D4_SDay150_SDay25"] <- "Day150 vs Day25"
+CuratedSig$LogFpkmDelta$Stage[CuratedSig$LogFpkmDelta$Stage=="D5_SDay200_SDay25"] <- "Day200 vs Day25"
+
+CuratedSig$LogFpkmDelta$Stage <- factor(CuratedSig$LogFpkmDelta$Stage, levels= c("Day50 vs Day25", "Day100 vs Day25", "Day150 vs Day25", "Day200 vs Day25"))
+```
+
+```{r DeltaLogFpkmvsDay25_lolli, collapse=TRUE, fig.height=10, fig.width=6}
+CuratedSig$LolliDelta <- LolliPopCols(CuratedSig$LogFpkmDelta, PointSize=4, SegSize=1.5,
+                                            cols=ColVec, yLow=-3, yHigh=4,  CeilUp=4, CeilDown=-3, 
+                                            unit='DeltaLogFpkm', Shape=18, GeneSize=5, filterZero=FALSE)
+CuratedSig$LolliDelta
+```
+
+
+#### 8.5 Delta Log2Fpkm compared to iPSC
+
+```{r, collapse=TRUE}
+CuratedSig$LogFpkmDeltaII <- DeltaLogFpkmMean(CuratedSig$LogFpkmMean, GroupCol='Stage', DiscardStage=NULL, 
+                                                             RefStage="SDay0", Arrange='Population', Th=-1.5, Substitute=NA)
+CuratedSig$LogFpkmDeltaII
+print(paste('DeltaLogFpkm Genes', dim(CuratedSig$LogFpkmDeltaII)[1]))
+print(paste('Min Value', round(min(CuratedSig$LogFpkmDeltaII$ExpMean, na.rm=T),2)))
+print(paste('Max Value', round(max(CuratedSig$LogFpkmDeltaII$ExpMean, na.rm=T),2)))
+```  
+
+```{r, collapse=TRUE}
+CuratedSig$LogFpkmDeltaII$Stage[CuratedSig$LogFpkmDeltaII$Stage=="D2_SDay25_SDay0"] <- "Day25 vs Day0"
+CuratedSig$LogFpkmDeltaII$Stage[CuratedSig$LogFpkmDeltaII$Stage=="D3_SDay50_SDay0"] <- "Day50 vs Day0"
+CuratedSig$LogFpkmDeltaII$Stage[CuratedSig$LogFpkmDeltaII$Stage=="D4_SDay100_SDay0"] <- "Day100 vs Day0"
+CuratedSig$LogFpkmDeltaII$Stage[CuratedSig$LogFpkmDeltaII$Stage=="D5_SDay150_SDay0"] <- "Day150 vs Day0"
+CuratedSig$LogFpkmDeltaII$Stage[CuratedSig$LogFpkmDeltaII$Stage=="D6_SDay200_SDay0"] <- "Day200 vs Day0"
+
+CuratedSig$LogFpkmDeltaII$Stage <- factor(CuratedSig$LogFpkmDeltaII$Stage, levels= c("Day25 vs Day0", "Day50 vs Day0", "Day100 vs Day0", "Day150 vs Day0", "Day200 vs Day0"))
+```
+
+```{r DeltaLogFpkmvsDay0_lolli, collapse=TRUE, fig.height=10, fig.width=6}
+CuratedSig$LolliDeltaII <- LolliPopCols(CuratedSig$LogFpkmDeltaII, PointSize=4, SegSize=1.5,
+                                            cols=ColVec, yLow=-4.5, yHigh=8, CeilUp=8, CeilDown=-4.5, 
+                                            unit='DeltaLogFpkm', Shape=18, GeneSize=5, filterZero=FALSE)
+CuratedSig$LolliDeltaII
+```
+
+Saving in Pdf
+```{r, collapse=TRUE}
+ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'Cheroni_LogFpkm.pdf'), width=10, height=10)
+ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'Cheroni_LogFpkm.png'), width=10, height=10)
+
+ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'Cheroni_DeltaLogFpkm_vs25.pdf'), width=10, height=10)
+ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'Cheroni_DeltaLogFpkm_vs25.png'), width=10, height=10)
+```
+
+### 9. Savings
+
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+save.image(paste0(OutputFolder, '/', Dataset, 'EndpointsReceptorsExplorationOrganoidsWorkspace.RData'))
+```
+
+```{r SessionInfo}
+SessionInfo
+Date
+``` 

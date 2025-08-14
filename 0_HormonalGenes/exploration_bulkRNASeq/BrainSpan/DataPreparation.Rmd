@@ -1,0 +1,163 @@
+---
+title: "Preparation for exploration of receptors genes on BrainSpan samples"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    Dataset: 'BrainSpan'
+    ExpressionData: "~/DataDir/ExternalData/BulkData/BrainSpan/"
+    GeneAnnotationFile: '~/DataDir/ExternalData/BulkData/BenchmarkingOrganoids/AnnotationDF.txt'
+    OutputFolder: '~/DataDir/ExternalData/BulkData/BrainSpan/OutputPreparation/'
+---
+
+### Analysis purpose
+
+From expression data and metadata relative to brainspan dataset, select the information of interest (pre-natal cortex) and structure the data for downstream interrogation (log2Fpkm mean expression for each stage). 
+
+
+Object created during the analysis: __PreCortex list__, containing expression levels and metadata:
+ 
+ * Rpkm expression
+ * Log2Rpkm expression
+ * Metadata
+ 
+### 1. SetUp
+
+Library and source upload
+```{r, collapse=TRUE}
+library(tidyr)
+library(dplyr)
+```
+
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+Folder organization
+```{r FolderSetting}
+ExpressionData <- params$ExpressionData 
+OutputFolder <- params$OutputFolder
+
+if (dir.exists(OutputFolder) == FALSE) {
+  dir.create(OutputFolder, showWarnings=TRUE, recursive=TRUE)
+}
+```
+
+****
+
+### 2. Data Upload
+
+```{r, echo=FALSE}
+load(paste0(ExpressionData, 'ExpressionMatrix.RData'))
+load(paste0(ExpressionData, 'ColumnMeta.RData'))
+
+if(!identical(colnames(ExpressionMatrix), ColumnMeta$ID)){
+  stop('Inconsistency in Expression and Metadata matrices!')
+  }
+```
+
+
+****
+
+
+### 3. Data manipulation: aggregation for Brainspan data
+
+
+#### 3.1 Filtering: Pre-birth gene expression only in cortex
+
+```{r, collapse=TRUE}
+NoCortex <- c('AMY', 'HIP', 'MGE', 'LGE', 'CGE', 'DTH', 'MD', 'STR', 'CBC', 'CB', 'URL')
+
+DataNoCortex <- unique(c(which(ColumnMeta$structure_acronym %in% NoCortex), which(ColumnMeta$Birth != 'Pre')))
+
+ColumnMetaPreCortex <- ColumnMeta[-DataNoCortex,] 
+ExpressionPreCortex <- ExpressionMatrix[, -DataNoCortex]
+
+if(!identical(colnames(ExpressionPreCortex), ColumnMetaPreCortex$ID)){
+  stop('Inconsistency in Expression and Metadata matrices!')
+  }
+```
+
+After filtering, the dataset is structured in `r dim(ExpressionPreCortex)[1]` genes measured in `r dim(ExpressionPreCortex)[2]` samples. 
+
+
+#### 3.2 Expression matrix: Gene metadata
+
+```{r, collapse=TRUE}
+GeneAnnotationFile <- params$GeneAnnotationFile
+AnnPrel <- read.table(GeneAnnotationFile, sep='\t', header=TRUE)
+# duplicated genes that will be discarded
+AnnPrel[duplicated(AnnPrel$external_gene_name), 1:3]
+
+Ann <- AnnPrel[!duplicated(AnnPrel$external_gene_name), c(1,2,4,5)]
+dim(Ann)
+table(duplicated(Ann$external_gene_name))
+table(duplicated(Ann$EnsGene))
+```
+
+
+```{r, collapse=TRUE}
+Rpkm <- ExpressionPreCortex %>% mutate(EnsGene=row.names(ExpressionPreCortex)) %>% inner_join(Ann, by='EnsGene') %>% 
+  rename(GeneBiotype=gene_biotype, GeneName=external_gene_name)
+row.names(Rpkm) <- Rpkm$GeneName
+
+dim(Rpkm) #44507
+
+table(duplicated(Rpkm$GeneName))
+table(duplicated(Rpkm$EnsGene))
+```
+
+
+#### 3.3 List with data and metadata information
+
+```{r, collapse=TRUE}
+# Structure Meta data
+MetaPreCortex <- data.frame(ID=colnames(Rpkm)[1:162], names=colnames(ExpressionPreCortex)[1:162]) %>%
+  inner_join(ColumnMetaPreCortex, by='ID') %>%
+  mutate(Stage=as.numeric(matrix(unlist(strsplit(age, ' ')), ncol=2, byrow=TRUE)[,1]))
+head(MetaPreCortex)
+```
+
+
+__Log2 transformation:__
+```{r, collapse=TRUE}
+# List for downstream functions
+Log2Rpkm <- cbind(log2(Rpkm[,1:162]+1), Rpkm[,163:166])
+```
+
+__List:__
+```{r, collapse=TRUE}
+# List for downstream functions
+PreCortex <- list()
+
+PreCortex$Rpkm <- Rpkm
+PreCortex$Log2Rpkm <- Log2Rpkm
+PreCortex$Meta <- MetaPreCortex
+```
+
+
+### 4. Save information 
+
+```{r Save}
+saveRDS(PreCortex, file=paste0(OutputFolder, 'PreCortexRpkmList.rds'))
+save.image(file=paste0(OutputFolder, 'AnalysisWorkspace.RData'))
+```
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r}
+Date
+SessionInfo
+```
+
+
