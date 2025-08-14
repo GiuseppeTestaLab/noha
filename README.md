@@ -31,14 +31,14 @@ The work is accessible [here](1_bulkRNASeq/7_DataMining/0.Index.md).
 
 ## Containers
 
-- for the bulkRNAseq and steroidomics analyses it can be retrieved via `docker pull testalab/downstream:EndPoints-1.1.5`.
+- for the bulkRNAseq and steroidomics analyses it can be retrieved via `docker pull testalab/downstream:EndPoints-1.1.5`. R packages were versioned with renv and the renv.lock is available in this repo [here](renv.lock).
 - for the scRNAseq analyses it can be retrieved via `docker pull alessiavalenti/sc:sc-noha-0.0.1`.
 - for the imaging analyses it can be retrieved via `docker pull alessiavalenti/imaging:TMA-0.0.1`.
 
 
 ## html notebooks
 
-An html version of the notebooks is accessible [here](link to the github.io page).
+An html version of the notebooks is accessible [here](https://giuseppetestalab.github.io/noha/).
 
 
 ## Code folders
