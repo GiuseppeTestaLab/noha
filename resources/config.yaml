@@ -10,10 +10,10 @@ final: |
 
 pages:
    GeneExploration_Cheroni2022:
-      notebook: "0_HormonalGenes/exploration_bulkRNASeq/Cheroni_etal2022/GeneExploration.html"
+      notebook: "0_HormonalGenes/exploration_bulkRNASeq/Cheroni_etal2022/Cheroni_GeneExploration.html"
       description: Exploration of gene expression in Cheroni et al. 2022 bulk RNA-Seq dataset.
    GeneExploration_BrainSpan:
-      notebook: "0_HormonalGenes/exploration_bulkRNASeq/BrainSpan/GeneExploration.html"
+      notebook: "0_HormonalGenes/exploration_bulkRNASeq/BrainSpan/BrainSpan_GeneExploration.html"
       description: Exploration of gene expression patterns in the BrainSpan dataset.
    ExplorationCastaldi:
       notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/ExplorationCastaldi.html"
