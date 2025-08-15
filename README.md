@@ -1,6 +1,6 @@
 # Neural Organoid Hormonal Atlas (NOHA)
 
-Repository for the [Neural Organoid Hormonal Atlas](biorxiv doi).
+Repository for the [Neural Organoid Hormonal Atlas, bioRxiv](https://www.biorxiv.org/content/10.1101/2025.08.14.669814v1.full.pdf).
 
 > A molecular cell atlas of endocrine signalling in human neural organoids 
 
@@ -40,7 +40,6 @@ The work is accessible [here](1_bulkRNASeq/7_DataMining/0.Index.md).
 ## html notebooks
 
 An html version of the notebooks is accessible [here](https://giuseppetestalab.github.io/noha/).
-
 
 ## Code folders
 
