@@ -1,0 +1,275 @@
+---
+title: "Bulk RNASeq: additional exploratory plots - CTL08"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    SEBio: "~/DataDir/bulkRNASeq/3.DataExploration/CTL08/Output/AfterSamplesSelection/MaleLineSE_Bio.rds"
+    OutputFolder: '~/'
+    CpmFilt: 2
+    SampleFilt: 4
+---
+
+## Exploratory analysis on `r params$Dataset`
+
+### 1. Environment Set Up
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(RNASeqBulkExploratory)  #Our Package
+library(DT)
+library(gridExtra)
+library(SummarizedExperiment)
+library(ggplot2)
+```
+
+```{r FolderSetting}
+SE_Bio <- readRDS(params$SEBio)
+CpmFilt <- params$CpmFilt
+SampleFilt <- params$SampleFilt
+OutputFolder <- params$OutputFolder
+```
+
+****
+
+### 2. Data Upload
+
+```{r SE_Filt, collapse=TRUE}
+SE_Filt <- filterSE(SE_Bio, cpmTh=CpmFilt, sampleTh=SampleFilt)
+```
+
+ * Re-calculate library size and calculate TMM
+ * Calculate cpm and logCpm (with normalization) and store in SE_Filt
+
+```{r SE_norm, collapse=TRUE}
+SE_Filt <- normTmmSE(SE_Filt, useNormFactors=TRUE, priorCount=0.25)  
+```
+
+
+### 3. Sample-to-sample correlation heatmap
+
+Correlation matrix across samples calculated on the basis of the Spearman correlation. Heatmap annotation takes into consideration sample 'Condition' by default. 
+
+```{r HeatmapSize, collapse=TRUE}
+# Set heatmap size on the basis of the number of samples
+Width <- 7 + (dim(SE_Filt)[2]- 8) * 0.24
+Width <- ifelse(Width<=14, Width, 14)
+Height <- 5 + (dim(SE_Filt)[2]- 8) * 0.22
+```
+
+```{r PCACol, collapse=TRUE}
+Cols <- c('DMSO' = 'grey30', 'CTL' = 'azure3', 
+                 'AhHyd_Ag'='#F8766D', 'AhHyd_Inh'='#F8766D50',
+                 'Andr_Ag'='#fccb17', 'Andr_Inh'='#C49A0050',  
+                 "Estr_Ag"= '#53B400', "Estr_Inh"= '#53B40050', 
+                 'GC_Ag' = '#00C094', 'GC_Inh' = '#00C09450',
+                 'LivX_Ag' = '#00B6EB', 'LivX_Inh' = '#00B6EB50', 
+                 'Ret_Ag' = '#A58AFF', 'Ret_Inh' = '#A58AFF50', 
+                 'Thyr_Ag' = '#FB61D7', 'Thyr_Inh' = '#FB61D750'
+                 )
+
+colData(SE_Filt)$SeqRun <- factor(colData(SE_Filt)$SeqRun,
+                                  levels = c("20210310", "20210724", "20220422"),
+                                  labels = c("batch1_run1", "batch1_run2", "batch2_run3"))
+
+seqrun_cols <- c(
+  "batch1_run1" = "#0072B2",  
+  "batch1_run2" = "#D55E00",  
+  "batch2_run3" = "#CC79A7"   
+)
+```
+
+
+```{r, fig.align='center', collapse=TRUE}
+cond_order <- c("CTL", "DMSO")
+other_cond <- setdiff(unique(colData(SE_Filt)$Condition), cond_order)
+cond_levels <- c(cond_order, sort(other_cond))
+colData(SE_Filt)$Condition <- factor(
+  colData(SE_Filt)$Condition,
+  levels = cond_levels
+)
+ord <- order(colData(SE_Filt)$Condition)
+
+SE_Filt_ord <- SE_Filt[, ord]
+```
+
+
+```{r}
+sampleCorrHeatmap2 <- function(
+    SE,
+    plotTitle = NULL,
+    annotation_col = NULL,
+    annotation_colors = NULL,
+    myPalette = NULL,
+    display_numbers = TRUE,
+    ...
+) {
+    if (is.null(plotTitle)) {
+        plotTitle <- deparse(substitute(SE))
+    }
+
+    if (is.null(annotation_col)) {
+        ann_fields <- match("Condition", names(colData(SE)))
+        if (is.na(ann_fields)) {
+            warning("The SE object does not contain the default 'Condition' annotation field")
+            ann_fields <- integer(0)
+        }
+    } else {
+        ann_fields <- match(annotation_col, names(colData(SE)))
+        if (any(is.na(ann_fields))) {
+            warning(
+                paste(
+                    "WARNING: missing annotation field(s):",
+                    paste(annotation_col[is.na(ann_fields)], collapse = ", ")
+                )
+            )
+            ann_fields <- ann_fields[!is.na(ann_fields)]
+        }
+    }
+
+    annotation_df <- as.data.frame(colData(SE)[ann_fields])
+
+    if (!("logcpm" %in% names(assays(SE)))) {
+        stop('SE object has no "logcpm" assay, please use normTmmSE() to compute it')
+    }
+
+    SampleCorr <- stats::cor(assays(SE)$logcpm, method = "spearman")
+
+    if (is.null(myPalette)) {
+        GreenCols <- grDevices::colorRampPalette(
+            RColorBrewer::brewer.pal(7, "Greens")
+        )(255)
+    } else {
+        GreenCols <- myPalette
+    }
+
+    if (ncol(SE) > 20) {
+        display_numbers <- FALSE
+        message('There are many samples. For readability "display_numbers" will be set to FALSE')
+    }
+
+    pheatmap::pheatmap(
+        as.matrix(SampleCorr),
+        main = paste(plotTitle, "\n Spearman correlation"),
+        col = GreenCols,
+        annotation_col = annotation_df,
+        annotation_colors = annotation_colors,
+        fontsize_col = 6,
+        fontsize_row = 6,
+        clustering_method = "average",
+        display_numbers = display_numbers,
+        ...
+    )
+}
+```
+
+```{r}
+sampleCorrHeatmap2(
+  SE_Filt_ord,
+  plotTitle = "Filtered dataset",
+  annotation_col = c("SeqRun", "Condition"),
+  annotation_colors = list(
+    Condition = Cols,
+    SeqRun = seqrun_cols),
+  display_numbers = TRUE,
+  cluster_rows = TRUE,
+  cluster_cols = TRUE,
+  show_rownames = FALSE,
+  show_colnames = FALSE
+)
+```
+
+```{r}
+ggsave(filename=paste0(OutputFolder, 'PAPER_CORRPLOTS/SampleCorr_CTL08_v2.pdf'), 
+       plot=sampleCorrHeatmap2(
+  SE_Filt_ord,
+  plotTitle = "Filtered dataset",
+  annotation_col = c("SeqRun", "Condition"),
+  annotation_colors = list(
+    Condition = Cols,
+    SeqRun = seqrun_cols),
+  display_numbers = TRUE,
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  show_rownames = FALSE,
+  show_colnames = FALSE
+),
+       device='pdf', width=5, height=5)
+```
+
+### 4. Principal Component Analysis Plot
+
+```{r PCA, fig.align='center', fig.width=9, fig.height=6.5}  
+pcaSE(SE_Filt, PlotTitle='First-Second Component', components=c(1,2), Interactive=TRUE, colVec = Cols)
+```
+
+```{r PCA_run, fig.align='center', fig.width=9, fig.height=6.5} 
+#SE_Filt@colData@listData[["SeqRun"]] <- as.character(SE_Filt@colData@listData[["SeqRun"]])
+pcaSE(SE_Filt, PlotTitle='First-Second Component', components=c(1,2), condition = "SeqRun", colVec = seqrun_cols)
+```
+
+```{r}
+pcaSE_new <- function(SE, PlotTitle = NULL, colVec = NULL, 
+                  components = c(1, 2), condition = "Condition", 
+                  Interactive = TRUE) 
+{
+    PCA_list <- calculatePCA(SE, condition = condition)
+
+    if (is.null(PlotTitle)) {
+        PlotTitle = deparse(substitute(SE))
+    }
+
+    PCData <- PCA_list$PCAData[, c(components, 5, 6)]
+    names(PCData) <- c("x_PC", "y_PC", "Sample", "Condition")
+
+    sub <- "Principal Component Analysis"
+    pcx <- paste("PC", components[1], "- VarExp: ", round(PCA_list$Var[components[1]], 2))
+    pcy <- paste("PC", components[2], "- VarExp: ", round(PCA_list$Var[components[2]], 2))
+
+    if (is.null(colVec)) {
+        colVec = (scales::hue_pal())(length(unique(colData(SE)[[condition]])))
+    }
+
+    PCAPl <- ggplot(PCData, aes(x = .data$x_PC, y = .data$y_PC)) +
+        geom_point(aes(col = .data$Condition), size = 3) +
+        labs(x = pcx, y = pcy, title = PlotTitle, subtitle = sub) +
+        scale_colour_manual(values = colVec, name = NULL) +
+        theme_bw() +
+        theme(plot.title = element_text(face = "bold", colour = "darkred", size = 14, hjust = 0.5),
+              plot.subtitle = element_text(colour = "darkred", size = 12, hjust = 0.5),
+              legend.text = element_text(size = 8),
+              legend.position = "bottom")
+
+    if (Interactive == TRUE) {
+        PCAPl <- plotly::ggplotly(PCAPl, tooltip = c("Sample", "Condition")) %>%
+            plotly::layout(title = list(text = paste0(PlotTitle, "<br>", "<sup>", sub)))
+        return(PCAPl)
+    } else {
+        return(PCAPl) 
+    }
+}
+```
+
+```{r}
+ggsave(filename=paste0(OutputFolder, 'PAPER_CORRPLOTS/PCA_run_CTL08.pdf'),
+       plot=pcaSE_new(SE_Filt, PlotTitle='First-Second Component', components=c(1,2), condition = "SeqRun", colVec = seqrun_cols, Interactive = FALSE), device='pdf', width=6, height=5)
+```
+
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r SessionInfo}
+SessionInfo
+Date
+``` 

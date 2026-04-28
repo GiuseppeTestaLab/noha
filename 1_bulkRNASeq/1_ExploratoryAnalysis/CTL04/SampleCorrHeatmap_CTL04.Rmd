@@ -1,0 +1,148 @@
+---
+title: "Bulk RNASeq: additional exploratory plots - CTL04"
+date: 'Date: `r format(Sys.Date(), "%B %d, %Y")`'
+output:
+    html_document:
+        toc: true
+        toc_float: true
+        theme: 'united'
+        highlight: 'kate'
+        code_folding: hide
+params: 
+    SEBio: "~/DataDir/bulkRNASeq/3.DataExploration/CTL04/Output/FemaleLineSE_Bio.rds"
+    OutputFolder: '~/'
+    CpmFilt: 2
+    SampleFilt: 4
+---
+
+### 1. Environment Set Up
+
+```{r}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE)
+```
+
+Values of RMarkdown parameters
+```{r EnvironmentSetupI, collapse=TRUE}
+for (i in 1:length(params))
+  print(paste('Parameter:', names(params)[i], ' - Value:', params[[i]], '- Class:', class(params[[i]])))
+```
+
+```{r EnvironmentSetupII, collapse=TRUE}
+library(RNASeqBulkExploratory)  #Our Package
+library(DT)
+library(gridExtra)
+library(SummarizedExperiment)
+library(ggplot2)
+```
+
+```{r FolderSetting}
+SE_Bio <- readRDS(params$SEBio)
+CpmFilt <- params$CpmFilt
+SampleFilt <- params$SampleFilt
+OutputFolder <- params$OutputFolder
+```
+
+****
+
+### 2. Data Upload
+
+```{r SE_Filt, collapse=TRUE}
+SE_Filt <- filterSE(SE_Bio, cpmTh=CpmFilt, sampleTh=SampleFilt)
+```
+
+ * Re-calculate library size and calculate TMM
+ * Calculate cpm and logCpm (with normalization) and store in SE_Filt
+
+```{r SE_norm, collapse=TRUE}
+SE_Filt <- normTmmSE(SE_Filt, useNormFactors=TRUE, priorCount=0.25)  
+```
+
+
+### 3. Sample-to-sample correlation heatmap
+Correlation matrix across samples calculated on the basis of the Spearman correlation.
+
+```{r HeatmapSize, collapse=TRUE}
+# Set heatmap size on the basis of the number of samples
+Width <- 7 + (dim(SE_Filt)[2]- 8) * 0.24
+Width <- ifelse(Width<=14, Width, 14)
+Height <- 5 + (dim(SE_Filt)[2]- 8) * 0.22
+```
+
+```{r, collapse=TRUE}
+Cols <- c('DMSO' = 'grey30', 'CTL' = 'azure3', 
+                 'AhHyd_Ag'='#F8766D', 'AhHyd_Inh'='#F8766D50',
+                 'Andr_Ag'='#fccb17', 'Andr_Inh'='#C49A0050',  
+                 "Estr_Ag"= '#53B400', "Estr_Inh"= '#53B40050', 
+                 'GC_Ag' = '#00C094', 'GC_Inh' = '#00C09450',
+                 'LivX_Ag' = '#00B6EB', 'LivX_Inh' = '#00B6EB50', 
+                 'Ret_Ag' = '#A58AFF', 'Ret_Inh' = '#A58AFF50', 
+                 'Thyr_Ag' = '#FB61D7', 'Thyr_Inh' = '#FB61D750'
+                 )
+```
+
+```{r, fig.align='center', collapse=TRUE}
+sampleCorrHeatmap(
+  SE_Filt,
+  plotTitle = "Filtered dataset",
+  annotation_col = c("Condition"),
+  annotation_colors = list(
+    Condition = Cols
+  ),
+  display_numbers = TRUE
+)
+```
+
+```{r, fig.align='center', collapse=TRUE}
+cond_order <- c("CTL", "DMSO")
+other_cond <- setdiff(unique(colData(SE_Filt)$Condition), cond_order)
+cond_levels <- c(cond_order, sort(other_cond))
+colData(SE_Filt)$Condition <- factor(
+  colData(SE_Filt)$Condition,
+  levels = cond_levels
+)
+ord <- order(colData(SE_Filt)$Condition)
+
+SE_Filt_ord <- SE_Filt[, ord]
+```
+
+```{r, fig.align='center', collapse=TRUE}
+sampleCorrHeatmap(
+  SE_Filt_ord,
+  plotTitle = "Filtered dataset",
+  annotation_col = c("Condition"),
+  annotation_colors = list(
+    Condition = Cols),
+  display_numbers = TRUE,
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  show_rownames = FALSE,
+  show_colnames = FALSE
+)
+```
+
+```{r SampleCorrSave, include=FALSE}
+ggsave(filename=paste0(OutputFolder, 'PAPER_CORRPLOTS/SampleCorr_CTL04.pdf'), 
+       plot=sampleCorrHeatmap(
+  SE_Filt_ord,
+  plotTitle = "Filtered dataset",
+  annotation_col = c("Condition"),
+  annotation_colors = list(
+    Condition = Cols),
+  display_numbers = TRUE,
+  cluster_rows = FALSE,
+  cluster_cols = FALSE,
+  show_rownames = FALSE,
+  show_colnames = FALSE
+),
+       device='pdf', width=5, height=5)
+```
+
+```{r SaveSession}
+SessionInfo <- sessionInfo()
+Date <- date()
+```
+
+```{r SessionInfo}
+SessionInfo
+Date
+``` 
