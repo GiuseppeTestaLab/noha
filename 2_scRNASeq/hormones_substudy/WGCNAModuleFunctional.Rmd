@@ -14,6 +14,10 @@ params:
 
 ## 1. Environment Set Up
 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
 ### 1.1 Values of RMarkdown parameters
 
 ```{r EnvironmentSetupI, collapse=TRUE}
@@ -41,7 +45,7 @@ OutputFolder <- params$OutputFolder
 ### 1.2 Helper functions
 
 ```{r, collapse=TRUE}
-source('../1_bulkRNASeq/6_WGCNA/WGCNAHelper.R')
+source('../../1_bulkRNASeq/6_WGCNA/WGCNAHelper.R')
 ```
 
 ****
