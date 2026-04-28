@@ -43,6 +43,8 @@ An html version of the notebooks is accessible [here](https://giuseppetestalab.g
 
 ## Code folders
 
+*  `0_HormonalGenes`: codes and notebooks related to the exploratory analysis of hormone-related gene expressions in external bulk and single-cell transcriptomic datasets. 
+
 * `1_bulkRNASeq`: codes and notebooks related to the bulk transcriptomic analysis.
 
 * `2_scRNASeq`: codes and notebooks related to the single-cell transcriptomic analysis.
