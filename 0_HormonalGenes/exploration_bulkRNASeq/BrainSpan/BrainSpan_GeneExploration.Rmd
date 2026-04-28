@@ -94,7 +94,7 @@ After removal of week 25, 26 and 35:
 #### 2.2 Gene signatures
 
 ```{r, collapse=TRUE}
-GS <- read.table(file = '~/DataDir/ExternalData/Receptors/ReceptorsComplete.txt', 
+GS <- read.table(file = '~/DataDir/ExternalData/Receptors/EndocrineKeyGenes.txt', 
                          sep='\t', header=TRUE)
 colnames(GS)[2] <- "Population"
 ```
@@ -154,23 +154,28 @@ print(paste('Max Value', round(max(CuratedSig$LogRpkmMean$ExpMean), 2)))
 ### 4. Visualization by lollipop
 
 ```{r, collapse=TRUE, fig.height=10, fig.width=6}
-ColVec <- scales::hue_pal()(12)
-
+ColVec <- c('DMSO' = '#4D4D4D', 'AH' = '#F8766D', 'AND'= '#fccb17', 'EST' = '#53B400', 'GC' = '#00C094', 'LX' = '#00B6EB', 'RA' = '#A58AFF', 'THY' = '#FB61D7')
+ 
+#scales::hue_pal()(12)
 LogRpkmMeanRel <- CuratedSig$LogRpkmMean %>% dplyr::mutate(Stage=factor(Stage, levels=c('8', '9', '12', '13', '16', 
                                                                                             '17', '19', '21', '24', '37'))) 
 
 CuratedSig$Lolli <- LolliPopCols(Data=LogRpkmMeanRel, PointSize=2,
                                                    SegSize=1, yLow=0, yHigh=7, CeilDown=0, 
                                                    CeilUp=7, unit='LogRpkm', cols=ColVec,
-                                                   Shape=15, GeneSize=4.2, filterZero=FALSE)
+                                                   Shape=15, GeneSize=7, filterZero=FALSE)+
+                                                theme(
+                                                      legend.text = element_text(size = 12),
+                                                      legend.title = element_text(size = 14)
+                                                    ) + labs(color = "Pathway")
 
 
 CuratedSig$Lolli
 ```
 
 ```{r, collapse=TRUE}
-ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'BSpan_LogRpkm.pdf'), width=10, height=10)
-ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'BSpan_LogRpkm.png'), width=10, height=10)
+ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'BSpan_LogRpkm.pdf'), width=5, height=10)
+ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'BSpan_LogRpkm.png'), width=5, height=10)
 ```
 
 
@@ -200,14 +205,18 @@ LogRpkmDeltaRel <- CuratedSig$LogRpkmDelta %>% dplyr::mutate(Stage=factor(Stage,
 
 CuratedSig$LolliDelta <- LolliPopCols(LogRpkmDeltaRel, PointSize=4, SegSize=1.5,
                                             cols=ColVec, yLow=-2, yHigh=4,  CeilUp=4, CeilDown=-2, 
-                                            unit='DeltaLogRpkm', Shape=18, GeneSize=5, filterZero=FALSE)
+                                            unit='DeltaLogRpkm', Shape=18, GeneSize=7, filterZero=FALSE)+
+                                                theme(
+                                                      legend.text = element_text(size = 12),
+                                                      legend.title = element_text(size = 14)
+                                                    ) + labs(color = "Pathway")
 CuratedSig$LolliDelta
 ```
 
 
 ```{r, collapse=TRUE}
-ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder,  'BSpan_DeltaLogRpkm.pdf'), width=10, height=10)
-ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'BSpan_DeltaLogRpkm.png'), width=10, height=10)
+ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder,  'BSpan_DeltaLogRpkm.pdf'), width=5, height=10)
+ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'BSpan_DeltaLogRpkm.png'), width=5, height=10)
 ```
 
 

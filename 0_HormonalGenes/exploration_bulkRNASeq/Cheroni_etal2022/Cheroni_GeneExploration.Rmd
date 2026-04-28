@@ -271,7 +271,7 @@ metadata(SE_Filt)$anno_colors <- list(Condition = c("Day0" = "#ffff3f", "Day25" 
 #### 7.2 Upload gene signature
 
 ```{r, collapse=TRUE}
-GS <- read.table(file = '~/DataDir/ExternalData/Receptors/ReceptorsComplete.txt', 
+GS <- read.table(file = '~/DataDir/ExternalData/Receptors/EndocrineKeyGenes.txt', 
                          sep='\t', header=TRUE)
 ```
 
@@ -311,7 +311,7 @@ sorting <- as.data.frame(colData(SE_Filt))%>%dplyr::arrange(Condition)%>%rowname
 #### 7.3 Expression levels: logFpkm without scaling
 
 
-```{r logfpkm, collapse=TRUE, fig.width=15, fig.height=14}
+```{r logfpkm, collapse=TRUE, fig.width=5, fig.height=12}
 assays(SE_Filt[row.names(SE_Filt) %in% Genes, ])$logfpkm %>% quantile(seq(0,1, by=0.1))
 
 ExpCols <- viridisLite::cividis(length(seq(-10, 7, by=0.2)))
@@ -323,7 +323,7 @@ sechm(SE_Filt[, sorting], features=Genes, assayName="logfpkm", gaps_row="Signatu
 
 #### 7.4 Expression levels: scaled logFpkm
 
-```{r scaledlogfpkm, collapse=TRUE, fig.width=15, fig.height=14}
+```{r scaledlogfpkm, collapse=TRUE, fig.width=5, fig.height=12}
 ScaledCols <- c('darkblue', "purple","white","lightgoldenrod1", 'goldenrod1')
 
 sechm::sechm(SE_Filt[, sorting], features=Genes, assayName="logfpkm", gaps_row="Signatures", top_annotation = c("Condition", "Sex"),  show_rownames=TRUE, left_annotation = "Signatures", show_colnames=TRUE, sortRowsOn=NULL, cluster_rows=FALSE, hmcols=ScaledCols, do.scale=TRUE, breaks=0.8, column_title = "Scaled LogFpkm")
@@ -336,13 +336,13 @@ GS_Exp <- assays(SE_Filt[row.names(SE_Filt) %in% Genes, ])$logcpm
 head(GS_Exp)
 ```
 
-```{r scaledlogcpm, collapse=TRUE, fig.width=15, fig.height=14}
+```{r scaledlogcpm, collapse=TRUE, fig.width=5, fig.height=12}
 sechm::sechm(SE_Filt[, sorting], features=Genes, assayName="logcpm", gaps_row="Signatures", top_annotation = c("Condition", "Sex"),  show_rownames=TRUE, left_annotation = "Signatures", show_colnames=TRUE, sortRowsOn=NULL, cluster_rows=FALSE, hmcols=ScaledCols, do.scale=TRUE, breaks=0.8, column_title = "Scaled LogCpm")
 ```
 
 #### 7.6 Expression levels: Log2FC versus Day0
 
-```{r logFC,    collapse=TRUE, fig.width=15, fig.height=14}
+```{r logFC,    collapse=TRUE, fig.width=5, fig.height=12}
 sechm(SE_Filt[, sorting], features=Genes, assayName="log2FC", gaps_row="Signatures", top_annotation = c("Condition", "Sex"), left_annotation = "Signatures", show_colnames=TRUE, sortRowsOn=NULL, cluster_rows=FALSE,
       show_rownames = TRUE, hmcols=ScaledCols, 
       do.scale=FALSE, breaks = 0.85, column_title = "LogFC versus Day0")
@@ -401,15 +401,19 @@ print(paste('Min Value', round(min(CuratedSig$LogFpkmMean$ExpMean), 2)))
 print(paste('Max Value', round(max(CuratedSig$LogFpkmMean$ExpMean), 2)))
 ```   
 
-```{r MeanLogFpkm_lolli, collapse=TRUE, fig.height=10, fig.width=6}
-ColVec <- scales::hue_pal()(12)
+```{r MeanLogFpkm_lolli, collapse=TRUE, fig.height=12, fig.width=6}
+ColVec <- c('DMSO' = '#4D4D4D', 'AH' = '#F8766D', 'AND'= '#fccb17', 'EST' = '#53B400', 'GC' = '#00C094', 'LX' = '#00B6EB', 'RA' = '#A58AFF', 'THY' = '#FB61D7')
+#scales::hue_pal()(12)
 
 colnames(CuratedSig$LogFpkmMean)[2] <- "Stage"
 
 CuratedSig$Lolli <- LolliPopCols(Data=CuratedSig$LogFpkmMean, PointSize=2.5,
                                                    SegSize=1.5, yLow=0, yHigh=7, CeilDown=0, 
                                                    CeilUp=7, unit='LogFpkm', cols=ColVec,
-                                                   Shape=15, GeneSize=5, filterZero=FALSE)
+                                                   Shape=15, GeneSize=7, filterZero=FALSE) + theme(
+                                                      legend.text = element_text(size = 12),
+                                                      legend.title = element_text(size = 14)
+                                                    )+ labs(color = "Pathway")
 CuratedSig$Lolli 
 ```
 
@@ -440,10 +444,14 @@ CuratedSig$LogFpkmDelta$Stage[CuratedSig$LogFpkmDelta$Stage=="D5_SDay200_SDay25"
 CuratedSig$LogFpkmDelta$Stage <- factor(CuratedSig$LogFpkmDelta$Stage, levels= c("Day50 vs Day25", "Day100 vs Day25", "Day150 vs Day25", "Day200 vs Day25"))
 ```
 
-```{r DeltaLogFpkmvsDay25_lolli, collapse=TRUE, fig.height=10, fig.width=6}
-CuratedSig$LolliDelta <- LolliPopCols(CuratedSig$LogFpkmDelta, PointSize=4, SegSize=1.5,
+```{r DeltaLogFpkmvsDay25_lolli, collapse=TRUE, fig.height=12, fig.width=6}
+CuratedSig$LolliDelta <- LolliPopCols(CuratedSig$LogFpkmDelta, PointSize=3, SegSize=1.5,
                                             cols=ColVec, yLow=-3, yHigh=4,  CeilUp=4, CeilDown=-3, 
-                                            unit='DeltaLogFpkm', Shape=18, GeneSize=5, filterZero=FALSE)
+                                            unit='DeltaLogFpkm', Shape=18, GeneSize=7, filterZero=FALSE) +
+                                                theme(
+                                                      legend.text = element_text(size = 12),
+                                                      legend.title = element_text(size = 14)
+                                                    ) + labs(color = "Pathway")
 CuratedSig$LolliDelta
 ```
 
@@ -469,20 +477,24 @@ CuratedSig$LogFpkmDeltaII$Stage[CuratedSig$LogFpkmDeltaII$Stage=="D6_SDay200_SDa
 CuratedSig$LogFpkmDeltaII$Stage <- factor(CuratedSig$LogFpkmDeltaII$Stage, levels= c("Day25 vs Day0", "Day50 vs Day0", "Day100 vs Day0", "Day150 vs Day0", "Day200 vs Day0"))
 ```
 
-```{r DeltaLogFpkmvsDay0_lolli, collapse=TRUE, fig.height=10, fig.width=6}
-CuratedSig$LolliDeltaII <- LolliPopCols(CuratedSig$LogFpkmDeltaII, PointSize=4, SegSize=1.5,
+```{r DeltaLogFpkmvsDay0_lolli, collapse=TRUE, fig.height=12, fig.width=6}
+CuratedSig$LolliDeltaII <- LolliPopCols(CuratedSig$LogFpkmDeltaII, PointSize=3, SegSize=1.5,
                                             cols=ColVec, yLow=-4.5, yHigh=8, CeilUp=8, CeilDown=-4.5, 
-                                            unit='DeltaLogFpkm', Shape=18, GeneSize=5, filterZero=FALSE)
+                                            unit='DeltaLogFpkm', Shape=18, GeneSize=7, filterZero=FALSE)+ 
+                                                  theme(
+                                                      legend.text = element_text(size = 12),
+                                                      legend.title = element_text(size = 14)
+                                                    )+ labs(color = "Pathway")
 CuratedSig$LolliDeltaII
 ```
 
 Saving in Pdf
 ```{r, collapse=TRUE}
-ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'Cheroni_LogFpkm.pdf'), width=10, height=10)
-ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'Cheroni_LogFpkm.png'), width=10, height=10)
+ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'Cheroni_LogFpkm.pdf'), width=5, height=10)
+ggsave(plot=CuratedSig$Lolli, filename=paste0(OutputFolder, 'Cheroni_LogFpkm.png'), width=5, height=10)
 
-ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'Cheroni_DeltaLogFpkm_vs25.pdf'), width=10, height=10)
-ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'Cheroni_DeltaLogFpkm_vs25.png'), width=10, height=10)
+ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'Cheroni_DeltaLogFpkm_vs25.pdf'), width=5, height=10)
+ggsave(plot=CuratedSig$LolliDelta, filename=paste0(OutputFolder, 'Cheroni_DeltaLogFpkm_vs25.png'), width=5, height=10)
 ```
 
 ### 9. Savings
