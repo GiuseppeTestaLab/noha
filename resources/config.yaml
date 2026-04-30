@@ -15,24 +15,69 @@ pages:
    GeneExploration_BrainSpan:
       notebook: "0_HormonalGenes/exploration_bulkRNASeq/BrainSpan/BrainSpan_GeneExploration.html"
       description: Exploration of gene expression patterns in the BrainSpan dataset.
+   Castaldi_FA:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/Castaldi_FA.ipynb"
+      description: Castaldi et al. 2025 scRNA-seq dataset: force directed graph.
    ExplorationCastaldi:
       notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/ExplorationCastaldi.html"
       description: Initial exploration of the Castaldi et al. 2025 scRNA-Seq dataset.
+   SEACellsCastaldi:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/SEACellsCastaldi.html"
+      description: SEACells for metacell generation from the Castaldi et al. 2025 scRNA-Seq dataset.
    SEACellsCastaldi-GeneExploration:
       notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/SEACellsCastaldi-GeneExploration.html"
-      description: SEACells-based gene exploration in the Castaldi et al. 2025 scRNA-Seq dataset.
-   ExplorationPolioudakis:
-      notebook: "0_HormonalGenes/exploration_scRNASeq/Polioudakis_etal2019/ExplorationPolioudakis.html"
-      description: Initial exploration of the Polioudakis et al. 2019 scRNA-Seq dataset.
-   SEACellsPolioudakis-GeneExploration:
-      notebook: "0_HormonalGenes/exploration_scRNASeq/Polioudakis_etal2019/SEACellsPolioudakis-GeneExploration.html"
-      description: SEACells-based gene exploration in the Polioudakis et al. 2019 scRNA-Seq dataset.
+      description: Exploration of gene expression in metacells from the Castaldi et al. 2025 scRNA-Seq dataset.
+   ExplorationCastaldi_day50:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/day50/ExplorationCastaldi-day50.ipynb"
+      description: Exploratory analysis of day 50 samples from Castaldi et al. 2025 dataset.
+   SEACellsCastaldi_day50:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/day50/SEACellsCastaldi-day50.ipynb"
+      description: SEACells-based analysis of day 50 samples in Castaldi et al. 2025 dataset.
+   SubsetHNOCA:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/He_etal2024/1.SubsetHNOCA.ipynb"
+      description: Subsetting and preprocessing of HNOCA dataset from He et al. 2024.
+   ExplorationHNOCA_age:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/He_etal2024/2.ExplorationHNOCA_age.ipynb"
+      description: Exploration in HNOCA dataset after subset by age <= 50 DIV.
+   SEACellsHNOCA_age_DataPrep:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/He_etal2024/3.1SEACellsHNOCA_age_DataPrep.ipynb"
+      description: Data preparation for SEACells analysis on HNOCA dataset.
+   SEACellsHNOCA_age_MetaCellGen:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/He_etal2024/3.2SEACellsHNOCA_age_MetaCellGen.ipynb"
+      description: Generation of metacells using SEACells for HNOCA dataset and gene expression exploration in metacells.
+   ExplorationWang:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/ExplorationWang.ipynb"
+      description: Exploratory analysis of Wang et al. 2025 scRNA-seq dataset.
+   SEACellsWang_FirstTrimester:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang_FirstTrimester.ipynb"
+      description: SEACells analysis of first trimester samples in Wang et al. dataset.
+   SEACellsWang_SecondTrimester:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang_SecondTrimester.ipynb"
+      description: SEACells analysis of second trimester samples in Wang et al. dataset.
+   SEACellsWang_ThirdTrimester:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang_ThirdTrimester.ipynb"
+      description: SEACells analysis of third trimester samples in Wang et al. dataset.
+   SEACellsWang_GeneExploration_FirstTrimester:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang-GeneExploration_FirstTrimester.ipynb"
+      description: Gene expression exploration in metacells for first trimester samples.
+   SEACellsWang_GeneExploration_SecondTrimester:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang-GeneExploration_SecondTrimester.ipynb"
+      description: Gene expression exploration in metacells for second trimester samples.
+   SEACellsWang_GeneExploration_ThirdTrimester:
+      notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang-GeneExploration_ThirdTrimester.ipynb"
+      description: Gene expression exploration in metacells for third trimester samples.
    exploratoryQC_CTL04:
       notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL04/exploratoryQC_CTL04.html"
       description: Exploratory quality control of bulk RNA-Seq data for CTL04.
+   SampleCorrHeatmap_CTL04:
+      notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL04/SampleCorrHeatmap_CTL04.html"
+      description: Sample correlation heatmap for CTL04 bulk RNA-seq dataset.
    exploratoryQC_CTL08:
       notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL08/exploratoryQC_CTL08.html"
       description: Exploratory quality control of bulk RNA-Seq data for CTL08.
+   SampleCorrHeatmapBatchPCA_CTL08:
+      notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL08/SampleCorrHeatmapBatchPCA_CTL08.html"
+      description: Sample correlation and PCA analysis including batch effects for CTL08 dataset.     
    SignaturesCTL04_MainGenes:
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_MainGenes.html"
       description: Main gene signatures for CTL04 bulk RNA-Seq dataset.
@@ -198,6 +243,9 @@ pages:
    6.3_HVGs_androgens:
       notebook: "2_scRNASeq/6.3_HVGs_androgens.ipynb"
       description: Highly variable genes - androgens.
+   7.GeneSignatures_exploration:
+      notebook: "2_scRNASeq/7.GeneSignatures_exploration.ipynb"
+      description: Exploration of gene signatures (hormone- and metabolism-related genes) in scRNA-seq data.
    10.1_Androgen_substudy_DA:
       notebook: "2_scRNASeq/androgen_substudy/10.1_Androgen_substudy_DA.ipynb"
       description: Androgen substudy - differential abundance.
