@@ -1,284 +1,465 @@
 title: "Neural Organoid Hormonal Atlas (NOHA)"
 
-short_title: "A molecular cell atlas of endocrine signalling in human neural organoids"
+short_title: "NOHA"
 
 subtitle: |
-
-   Html versions of the most important scripts in the GitHub repository of the [Neural Organoid Hormonal Atlas](biorxiv doi).
+   Html versions of the main notebooks with the analyses for the paper of the [Neural Organoid Hormonal Atlas](https://www.biorxiv.org/content/10.1101/2025.08.14.669814v1.full.pdf). 
+   All the scripts are available in the [GitHub repository](https://github.com/GiuseppeTestaLab/noha).
 
 final: |
+   ## About this resource
+
+   This GitHub Pages site provides easy access to the main computational analyses supporting the Neural Organoid Hormonal Atlas (NOHA).
+
+   The resource includes hormone-related gene expression explorations in public datasets and NOHA bulk RNA-seq, single-cell RNA-seq, imaging and steroidomics analyses.
 
 pages:
    GeneExploration_Cheroni2022:
+      section: "Exploration in public bulk RNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_bulkRNASeq/Cheroni_etal2022/Cheroni_GeneExploration.html"
-      description: Exploration of gene expression in Cheroni et al. 2022 bulk RNA-Seq dataset.
+      description: "Exploration of gene expression in Cheroni et al. 2022 bulk RNA-Seq dataset."
+
    GeneExploration_BrainSpan:
+      section: "Exploration in public bulk RNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_bulkRNASeq/BrainSpan/BrainSpan_GeneExploration.html"
-      description: Exploration of gene expression patterns in the BrainSpan dataset.
+      description: "Exploration of gene expression patterns in the BrainSpan dataset."
+
    Castaldi_FA:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/Castaldi_FA.ipynb"
-      description: Castaldi et al. 2025 scRNA-seq dataset: force directed graph.
+      description: "Castaldi et al. 2025 scRNA-seq dataset - force directed graph."
+
    ExplorationCastaldi:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/ExplorationCastaldi.html"
-      description: Initial exploration of the Castaldi et al. 2025 scRNA-Seq dataset.
+      description: "Initial exploration of the Castaldi et al. 2025 scRNA-Seq dataset."
+
    SEACellsCastaldi:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/SEACellsCastaldi.html"
-      description: SEACells for metacell generation from the Castaldi et al. 2025 scRNA-Seq dataset.
+      description: "SEACells for metacell generation from the Castaldi et al. 2025 scRNA-Seq dataset."
+
    SEACellsCastaldi-GeneExploration:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/SEACellsCastaldi-GeneExploration.html"
-      description: Exploration of gene expression in metacells from the Castaldi et al. 2025 scRNA-Seq dataset.
-   ExplorationCastaldi_day50:
-      notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/day50/ExplorationCastaldi-day50.ipynb"
-      description: Exploratory analysis of day 50 samples from Castaldi et al. 2025 dataset.
+      description: "Exploration of gene expression in metacells from the Castaldi et al. 2025 scRNA-Seq dataset."
+
    SEACellsCastaldi_day50:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Castaldi_etal2025/day50/SEACellsCastaldi-day50.ipynb"
-      description: SEACells-based analysis of day 50 samples in Castaldi et al. 2025 dataset.
+      description: "SEACells-based analysis of day 50 samples in Castaldi et al. 2025 dataset."
+
    SubsetHNOCA:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/He_etal2024/1.SubsetHNOCA.ipynb"
-      description: Subsetting and preprocessing of HNOCA dataset from He et al. 2024.
+      description: "Subsetting and preprocessing of HNOCA dataset from He et al. 2024."
+
    ExplorationHNOCA_age:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/He_etal2024/2.ExplorationHNOCA_age.ipynb"
-      description: Exploration in HNOCA dataset after subset by age <= 50 DIV.
+      description: "Exploration in HNOCA dataset after subset by age <= 50 DIV."
+
    SEACellsHNOCA_age_DataPrep:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/He_etal2024/3.1SEACellsHNOCA_age_DataPrep.ipynb"
-      description: Data preparation for SEACells analysis on HNOCA dataset.
+      description: "Data preparation for SEACells analysis on HNOCA dataset."
+
    SEACellsHNOCA_age_MetaCellGen:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/He_etal2024/3.2SEACellsHNOCA_age_MetaCellGen.ipynb"
-      description: Generation of metacells using SEACells for HNOCA dataset and gene expression exploration in metacells.
+      description: "Generation of metacells using SEACells for HNOCA dataset and gene expression exploration in metacells."
+
    ExplorationWang:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/ExplorationWang.ipynb"
-      description: Exploratory analysis of Wang et al. 2025 scRNA-seq dataset.
+      description: "Exploratory analysis of Wang et al. 2025 scRNA-seq dataset."
+
    SEACellsWang_FirstTrimester:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang_FirstTrimester.ipynb"
-      description: SEACells analysis of first trimester samples in Wang et al. dataset.
+      description: "SEACells analysis of first trimester samples in Wang et al. dataset."
+
    SEACellsWang_SecondTrimester:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang_SecondTrimester.ipynb"
-      description: SEACells analysis of second trimester samples in Wang et al. dataset.
+      description: "SEACells analysis of second trimester samples in Wang et al. dataset."
+
    SEACellsWang_ThirdTrimester:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang_ThirdTrimester.ipynb"
-      description: SEACells analysis of third trimester samples in Wang et al. dataset.
+      description: "SEACells analysis of third trimester samples in Wang et al. dataset."
+
    SEACellsWang_GeneExploration_FirstTrimester:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang-GeneExploration_FirstTrimester.ipynb"
-      description: Gene expression exploration in metacells for first trimester samples.
+      description: "Gene expression exploration in metacells for first trimester samples."
+
    SEACellsWang_GeneExploration_SecondTrimester:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang-GeneExploration_SecondTrimester.ipynb"
-      description: Gene expression exploration in metacells for second trimester samples.
+      description: "Gene expression exploration in metacells for second trimester samples."
+
    SEACellsWang_GeneExploration_ThirdTrimester:
+      section: "Exploration in public scRNA-seq datasets"
       notebook: "0_HormonalGenes/exploration_scRNASeq/Wang_etal2025/SEACellsWang-GeneExploration_ThirdTrimester.ipynb"
-      description: Gene expression exploration in metacells for third trimester samples.
+      description: "Gene expression exploration in metacells for third trimester samples."
+
    exploratoryQC_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL04/exploratoryQC_CTL04.html"
-      description: Exploratory quality control of bulk RNA-Seq data for CTL04.
+      description: "Exploratory quality control of bulk RNA-Seq data for CTL04."
+
    SampleCorrHeatmap_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL04/SampleCorrHeatmap_CTL04.html"
-      description: Sample correlation heatmap for CTL04 bulk RNA-seq dataset.
+      description: "Sample correlation heatmap for CTL04 bulk RNA-seq dataset."
+
    exploratoryQC_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL08/exploratoryQC_CTL08.html"
-      description: Exploratory quality control of bulk RNA-Seq data for CTL08.
+      description: "Exploratory quality control of bulk RNA-Seq data for CTL08."
+
    SampleCorrHeatmapBatchPCA_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/1_ExploratoryAnalysis/CTL08/SampleCorrHeatmapBatchPCA_CTL08.html"
-      description: Sample correlation and PCA analysis including batch effects for CTL08 dataset.     
+      description: "Sample correlation and PCA analysis including batch effects for CTL08 dataset."
+
    SignaturesCTL04_MainGenes:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_MainGenes.html"
-      description: Main gene signatures for CTL04 bulk RNA-Seq dataset.
+      description: "Main gene signatures for CTL04 bulk RNA-Seq dataset."
+
    SignaturesCTL04_MetabolismGenes:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_MetabolismGenes.html"
-      description: Metabolism gene signatures for CTL04.
+      description: "Metabolism gene signatures for CTL04."
+
    SignaturesCTL04_ReceptorGenes:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_ReceptorGenes.html"
-      description: Receptor gene signatures for CTL04.
+      description: "Receptor gene signatures for CTL04."
+
    SignaturesCTL04_TargetGenes:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL04/SignaturesCTL04_TargetGenes.html"
-      description: Target gene signatures for CTL04.
+      description: "Target gene signatures for CTL04."
+
    SignaturesCTL08_MainGenes:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL08/SignaturesCTL08_MainGenes.html"
-      description: Main gene signatures for CTL08 bulk RNA-Seq dataset.
+      description: "Main gene signatures for CTL08 bulk RNA-Seq dataset."
+
    SignaturesCTL08_MetabolismGenes:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL08/SignaturesCTL08_MetabolismGenes.html"
-      description: Metabolism gene signatures for CTL08.
+      description: "Metabolism gene signatures for CTL08."
+
    SignaturesCTL08_ReceptorGenes:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL08/SignaturesCTL08_ReceptorGenes.html"
-      description: Receptor gene signatures for CTL08.
+      description: "Receptor gene signatures for CTL08."
+
    SignaturesCTL08_TargetGenes:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/2_GeneSignatures/CTL08/SignaturesCTL08_TargetGenes.html"
-      description: Target gene signatures for CTL08.
+      description: "Target gene signatures for CTL08."
+
    DeSeq2_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/3_DifferentialExpression/CTL04/DeSeq2_CTL04.html"
-      description: DESeq2 differential expression analysis of CTL04 bulk RNA-Seq dataset.
+      description: "DESeq2 differential expression analysis of CTL04 bulk RNA-Seq dataset."
+
    DeSeq2_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/3_DifferentialExpression/CTL08/DeSeq2_CTL08.html"
-      description: DESeq2 differential expression analysis of CTL08 bulk RNA-Seq dataset.
+      description: "DESeq2 differential expression analysis of CTL08 bulk RNA-Seq dataset."
+
    TopGO_AhHyd_Agonist_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_Agonist_CTL04.html"
-      description: topGO GO enrichment for AHR pathway - agonist (CTL04).
+      description: "topGO GO enrichment for AHR pathway - agonist vs DMSO (CTL04)."
+
    TopGO_AhHyd_AgvsInh_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_AgvsInh_CTL04.html"
-      description: topGO GO enrichment for AHR pathway - agonist vs inhibitor (CTL04).
+      description: "topGO GO enrichment for AHR pathway - agonist vs inhibitor vs DMSO (CTL04)."
+
    TopGO_AhHyd_Inhibitor_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_AhHyd_Inhibitor_CTL04.html"
-      description: topGO GO enrichment for AHR pathway - inhibitor (CTL04).
+      description: "topGO GO enrichment for AHR pathway - inhibitor vs DMSO (CTL04)."
+
    TopGO_Andr_Agonist_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Andr_Agonist_CTL04.html"
-      description: topGO GO enrichment for Androgen pathway - agonist (CTL04).
+      description: "topGO GO enrichment for Androgen pathway - agonist vs DMSO (CTL04)."
+
    TopGO_Andr_AgvsInh_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Andr_AgvsInh_CTL04.html"
-      description: topGO GO enrichment for Androgen pathway - agonist vs inhibitor (CTL04).
+      description: "topGO GO enrichment for Androgen pathway - agonist vs inhibitor vs DMSO (CTL04)."
+
    TopGO_Estr_AgvsInh_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Estr_AgvsInh_CTL04.html"
-      description: topGO GO enrichment for Estrogen pathway - agonist vs inhibitor (CTL04).
+      description: "topGO GO enrichment for Estrogen pathway - agonist vs inhibitor vs DMSO (CTL04)."
+
    TopGO_Estr_Inhibitor_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Estr_Inhibitor_CTL04.html"
-      description: topGO GO enrichment for Estrogen pathway - inhibitor (CTL04).
+      description: "topGO GO enrichment for Estrogen pathway - inhibitor vs DMSO (CTL04)."
+
    TopGO_GC_AgvsInh_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_GC_AgvsInh_CTL04.html"
-      description: topGO GO enrichment for Glucocorticoid pathway - agonist vs inhibitor (CTL04).
+      description: "topGO GO enrichment for Glucocorticoid pathway - agonist vs inhibitor vs DMSO (CTL04)."
+
    TopGO_GC_Inhibitor_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_GC_Inhibitor_CTL04.html"
-      description: topGO GO enrichment for Glucocorticoid pathway - inhibitor (CTL04).
+      description: "topGO GO enrichment for Glucocorticoid pathway - inhibitor vs DMSO (CTL04)."
+
    TopGO_LivX_AgvsInh_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_LivX_AgvsInh_CTL04.html"
-      description: topGO GO enrichment for Liver X receptor pathway - agonist vs inhibitor (CTL04).
+      description: "topGO GO enrichment for Liver X receptor pathway - agonist vs inhibitor vs DMSO (CTL04)."
+
    TopGO_LivX_Inhibitor_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_LivX_Inhibitor_CTL04.html"
-      description: topGO GO enrichment for Liver X receptor pathway - inhibitor (CTL04).
+      description: "topGO GO enrichment for Liver X receptor pathway - inhibitor vs DMSO (CTL04)."
+
    TopGO_Ret_Agonist_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_Agonist_CTL04.html"
-      description: topGO GO enrichment for Retinoid pathway - agonist (CTL04).
+      description: "topGO GO enrichment for Retinoid pathway - agonist vs DMSO (CTL04)."
+
    TopGO_Ret_AgvsInh_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_AgvsInh_CTL04.html"
-      description: topGO GO enrichment for Retinoid pathway - agonist vs inhibitor (CTL04).
+      description: "topGO GO enrichment for Retinoid pathway - agonist vs inhibitor vs DMSO (CTL04)."
+
    TopGO_Ret_Inhibitor_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Ret_Inhibitor_CTL04.html"
-      description: topGO GO enrichment for Retinoid pathway - inhibitor (CTL04).
+      description: "topGO GO enrichment for Retinoid pathway - inhibitor vs DMSO (CTL04)."
+
    TopGO_Thyr_Agonist_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_Agonist_CTL04.html"
-      description: topGO GO enrichment for Thyroid pathway - agonist (CTL04).
+      description: "topGO GO enrichment for Thyroid pathway - agonist vs DMSO (CTL04)."
+
    TopGO_Thyr_AgvsInh_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_AgvsInh_CTL04.html"
-      description: topGO GO enrichment for Thyroid pathway - agonist vs inhibitor (CTL04).
+      description: "topGO GO enrichment for Thyroid pathway - agonist vs inhibitor vs DMSO (CTL04)."
+
    TopGO_Thyr_Inhibitor_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL04/TopGO/TopGO_Thyr_Inhibitor_CTL04.html"
-      description: topGO GO enrichment for Thyroid pathway - inhibitor (CTL04).
+      description: "topGO GO enrichment for Thyroid pathway - inhibitor vs DMSO (CTL04)."
+
    TopGO_AhHyd_AgvsInh_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_AhHyd_AgvsInh_CTL08.html"
-      description: topGO GO enrichment for AHR pathway - agonist vs inhibitor (CTL08).
+      description: "topGO GO enrichment for AHR pathway - agonist vs inhibitor vs DMSO (CTL08)."
+
    TopGO_Estr_Agonist_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Estr_Agonist_CTL08.html"
-      description: topGO GO enrichment for Estrogen pathway - agonist (CTL08).
+      description: "topGO GO enrichment for Estrogen pathway - agonist vs DMSO (CTL08)."
+
    TopGO_GC_AgvsInh_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_GC_AgvsInh_CTL08.html"
-      description: topGO GO enrichment for Glucocorticoid pathway - agonist vs inhibitor (CTL08).
+      description: "topGO GO enrichment for Glucocorticoid pathway - agonist vs inhibitor vs DMSO (CTL08)."
+
    TopGO_GC_Inhibitor_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_GC_Inhibitor_CTL08.html"
-      description: topGO GO enrichment for Glucocorticoid pathway - inhibitor (CTL08).
+      description: "topGO GO enrichment for Glucocorticoid pathway - inhibitor vs DMSO (CTL08)."
+
    TopGO_LivX_Agonist_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_LivX_Agonist_CTL08.html"
-      description: topGO GO enrichment for Liver X receptor pathway - agonist (CTL08).
+      description: "topGO GO enrichment for Liver X receptor pathway - agonist vs DMSO (CTL08)."
+
    TopGO_LivX_AgvsInh_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_LivX_AgvsInh_CTL08.html"
-      description: topGO GO enrichment for Liver X receptor pathway - agonist vs inhibitor (CTL08).
+      description: "topGO GO enrichment for Liver X receptor pathway - agonist vs inhibitor vs DMSO (CTL08)."
+
    TopGO_Ret_Agonist_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Ret_Agonist_CTL08.html"
-      description: topGO GO enrichment for Retinoid pathway - agonist (CTL08).
+      description: "topGO GO enrichment for Retinoid pathway - agonist vs DMSO (CTL08)."
+
    TopGO_Ret_AgvsInh_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Ret_AgvsInh_CTL08.html"
-      description: topGO GO enrichment for Retinoid pathway - agonist vs inhibitor (CTL08).
+      description: "topGO GO enrichment for Retinoid pathway - agonist vs inhibitor vs DMSO (CTL08)."
+
    TopGO_Thyr_Agonist_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_Agonist_CTL08.html"
-      description: topGO GO enrichment for Thyroid pathway - agonist (CTL08).
+      description: "topGO GO enrichment for Thyroid pathway - agonist vs DMSO (CTL08)."
+
    TopGO_Thyr_AgvsInh_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_AgvsInh_CTL08.html"
-      description: topGO GO enrichment for Thyroid pathway - agonist vs inhibitor (CTL08).
+      description: "topGO GO enrichment for Thyroid pathway - agonist vs inhibitor vs DMSO (CTL08)."
+
    TopGO_Thyr_Inhibitor_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/4_FunctionalAnalysis/CTL08/TopGO/TopGO_Thyr_Inhibitor_CTL08.html"
-      description: topGO GO enrichment for Thyroid pathway - inhibitor (CTL08).
+      description: "topGO GO enrichment for Thyroid pathway - inhibitor vs DMSO (CTL08)."
+
    CTL04vsCTL08_Scatterplots:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/5_DEGsCharacterization/BothLines/CTL04vsCTL08_Scatterplots.html"
-      description: Scatterplots comparing DEGs between CTL04 and CTL08.
+      description: "Scatterplots comparing DEGs between CTL04 and CTL08."
+
    DEGsOverlap_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL04/DEGsOverlap_CTL04.html"
-      description: Overlap of differentially expressed genes for CTL04.
+      description: "Overlap of differentially expressed genes for CTL04."
+
    HeatmapsOverlappingDEGs_CTL04:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL04/HeatmapsOverlappingDEGs_CTL04.html"
-      description: Heatmaps of overlapping DEGs for CTL04.
+      description: "Heatmaps of overlapping DEGs for CTL04."
+
    DEGsOverlap_CTL08:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/5_DEGsCharacterization/CTL08/DEGsOverlap_CTL08.html"
-      description: Overlap of differentially expressed genes for CTL08.
+      description: "Overlap of differentially expressed genes for CTL08."
+
    1_NetworkGeneration:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/6_WGCNA/1_NetworkGeneration.html"
-      description: WGCNA network construction for bulk RNA-Seq.
+      description: "WGCNA network construction for bulk RNA-Seq."
+
    2_ModuleCharacterization:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/6_WGCNA/2_ModuleCharacterization.html"
-      description: Characterization of WGCNA modules for bulk RNA-Seq.
+      description: "Characterization of WGCNA modules for bulk RNA-Seq."
+
    3_ModuleFunctional:
+      section: "NOHA bulk RNA-seq analysis"
       notebook: "1_bulkRNASeq/6_WGCNA/3_ModuleFunctional.html"
-      description: Functional analysis of WGCNA modules for bulk RNA-Seq.
+      description: "Functional analysis of WGCNA modules for bulk RNA-Seq."
+
    1_load_cellranger_data:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/1_load_cellranger_data.ipynb"
-      description: Load Cell Ranger outputs into the scRNA-Seq workflow.
+      description: "Load Cell Ranger outputs into the scRNA-Seq workflow."
+
    2_Integrate_data:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/2_Integrate_data.ipynb"
-      description: Integrate scRNA-Seq datasets.
+      description: "Integrate scRNA-Seq datasets."
+
    3.2_StressSignatures_filt_hormones:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/3.2_StressSignatures_filt_hormones.ipynb"
-      description: Stress signature analysis.
+      description: "Stress signature analysis."
+
    3.3_StressSignatures_filt_androgens:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/3.3_StressSignatures_filt_androgens.ipynb"
-      description: Stress signature analysis - androgen.
+      description: "Stress signature analysis - androgen."
+
    3_QC_filt:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/3_QC_filt.ipynb"
-      description: Quality control and filtering of scRNA-Seq data.
+      description: "Quality control and filtering of scRNA-Seq data."
+
    5.0_Explo_controls:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/5.0_Explo_controls.ipynb"
-      description: Exploratory analysis - control samples.
+      description: "Exploratory analysis - control samples."
+
    5.1_Explo_hormones:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/5.1_Explo_hormones.ipynb"
-      description: Exploratory analysis - hormones samples.
+      description: "Exploratory analysis - hormones samples."
+
    5.4_Explo_androgen:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/5.4_Explo_androgen.ipynb"
-      description: Exploratory analysis - androgen samples.
+      description: "Exploratory analysis - androgen samples."
+
    6.1_HVGs_hormones:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/6.1_HVGs_hormones.ipynb"
-      description: Highly variable genes.
+      description: "Highly variable genes."
+
    6.3_HVGs_androgens:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/6.3_HVGs_androgens.ipynb"
-      description: Highly variable genes - androgens.
+      description: "Highly variable genes - androgens."
+
    7.GeneSignatures_exploration:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/7.GeneSignatures_exploration.ipynb"
-      description: Exploration of gene signatures (hormone- and metabolism-related genes) in scRNA-seq data.
+      description: "Exploration of gene signatures, including hormone- and metabolism-related genes, in scRNA-seq data."
+
    10.1_Androgen_substudy_DA:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/androgen_substudy/10.1_Androgen_substudy_DA.ipynb"
-      description: Androgen substudy - differential abundance.
+      description: "Androgen substudy - differential abundance."
+
    10.2_Hormones_substudy_LineMagnification_Neurons:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/hormones_substudy/10.2_Hormones_substudy_LineMagnification_Neurons.ipynb"
-      description: Hormones substudy - differential expression analysis for neurons.
+      description: "Hormones substudy - differential expression analysis for neurons."
+
    10.2_Hormones_substudy_LineMagnification_Progenitors:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/hormones_substudy/10.2_Hormones_substudy_LineMagnification_Progenitors.ipynb"
-      description: Hormones substudy - differential expression analysis for progenitors.
+      description: "Hormones substudy - differential expression analysis for progenitors."
+
    11.1_Hormones_substudy_LineMagnification_Progenitors_DA_divided:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/hormones_substudy/11.1_Hormones_substudy_LineMagnification_Progenitors_DA_divided.ipynb"
-      description: Hormones substudy - differential abundance analysis and WGCNA for progenitors.
+      description: "Hormones substudy - differential abundance analysis and WGCNA for progenitors."
+
    11.2_Hormones_substudy_LineMagnification_Neurons_DA_divided:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/hormones_substudy/11.2_Hormones_substudy_LineMagnification_Neurons_DA_divided.ipynb"
-      description: Hormones substudy - differential abundance analysis and WGCNA for neurons.
+      description: "Hormones substudy - differential abundance analysis and WGCNA for neurons."
+
    WGCNAModuleFunctional:
+      section: "NOHA scRNA-seq analysis"
       notebook: "2_scRNASeq/hormones_substudy/WGCNAModuleFunctional.html"
-      description: Functional characterization of WGCNA modules from scRNAseq dataset.
+      description: "Functional characterization of WGCNA modules from scRNAseq dataset."
+
    endpoints_PCA_analysis:
+      section: "Imaging analysis"
       notebook: "3_ImageAnalysis/notebooks/morphological_features/endpoints_PCA_analysis.ipynb"
-      description: PCA of morphological features of nuclei.
+      description: "PCA of morphological features of nuclei."
+
    plots_positivity_analysis_measurements:
+      section: "Imaging analysis"
       notebook: "3_ImageAnalysis/notebooks/plot_markers/plots_positivity_analysis_measurements.ipynb"
-      description: Comparison of proliferation and neuronal markers across exposures in IF.
+      description: "Comparison of proliferation and neuronal markers across exposures in IF."
+
    endpoints_plot_representative_images_MIX1:
+      section: "Imaging analysis"
       notebook: "3_ImageAnalysis/notebooks/representative_images/endpoints_plot_representative_images_MIX1.ipynb"
-      description: Representative images of antibodies MIX1 exposed organoids.
+      description: "Representative images of antibodies MIX1 exposed organoids."
+
    endpoints_plot_representative_images_MIX2:
+      section: "Imaging analysis"
       notebook: "3_ImageAnalysis/notebooks/representative_images/endpoints_plot_representative_images_MIX2.ipynb"
-      description: Representative images of antibodies MIX2 exposed organoids.
+      description: "Representative images of antibodies MIX2 exposed organoids."
+
    SteroidomicsVis:
+      section: "Steroidomics analysis"
       notebook: "4_steroidomics/SteroidomicsVis.html"
-      description: Visualization of steroidomics data.
+      description: "Visualization of steroidomics data."
+
    Steroidomics_WGCNA:
+      section: "Steroidomics analysis"
       notebook: "4_steroidomics/Steroidomics_WGCNA.html"
-      description: Comparison of steroidomics data with weighted gene co-expression analysis modules form bulkRNAseq.
+      description: "Comparison of steroidomics data with weighted gene co-expression analysis modules from bulkRNA-seq."
